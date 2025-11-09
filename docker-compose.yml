@@ -1,0 +1,60 @@
+version: "3.7"
+
+services:
+  project_db:
+    image: postgres:14
+    container_name: project_db
+    restart: always
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
+      - ./project-backend/scripts:/docker-entrypoint-initdb.d
+    ports:
+      - 5432:5432
+    env_file: "./.env"
+
+  project_be:
+    container_name: project_be
+    restart: always
+    build:
+      context: ./project-backend
+      dockerfile: infra/dockerfiles/Dockerfile
+    ports:
+      - 3000:3000
+    volumes:
+      - ${CERTS_PATH:-/dev/null}:/usr/src/certs:ro
+    depends_on:
+      - project_db
+    env_file: "./.env"
+
+  project_fe:
+    container_name: project_fe
+    restart: always
+    build:
+      context: ./project-frontend
+      dockerfile: infra/dockerfiles/Dockerfile
+    ports:
+      - 5000:5000
+    depends_on:
+      - project_be
+    env_file: "./.env"
+
+  nginx-service:
+    container_name: project-nginx
+    image: nginx:1.15-alpine
+    ports:
+      - "80:80" # This is important! Can't use the host's port to a different one that maps to container's port 80
+      - "443:443"
+    volumes:
+      - ./data/nginx:/etc/nginx/conf.d
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    command: '/bin/sh -c ''while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g "daemon off;"'''
+
+  certbot-service:
+    container_name: project-certbot
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"

@@ -1,0 +1,44 @@
+name: Lint
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: self-hosted
+    env:
+      YARN_CACHE_FOLDER: ${{ github.workspace }}/lint/.yarn-cache
+
+    steps:
+      - name: Clean workspace
+        run: rm -rf *
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-nvm
+
+      - name: Restore caches
+        uses: ./.github/actions/cache-deps
+        with:
+          operation: restore
+          job-type: lint
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --prefer-offline
+
+      - name: Save caches
+        uses: ./.github/actions/cache-deps
+        with:
+          operation: save
+          job-type: lint
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Clean workspace
+        if: always()
+        run: rm -rf *

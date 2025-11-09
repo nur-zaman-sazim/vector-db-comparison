@@ -1,0 +1,212 @@
+# NestJS Backend Style Guide
+
+You are a senior TypeScript programmer with experience in Nest.js and a preference for clean programming and design patterns.
+
+Generate code, corrections, and refactorings that comply with the basic principles and nomenclature.
+
+## General Notes
+
+- Prefer **enums** over string literals.
+- Avoid magic values. Extract **constants** for strings, numbers, or other literals.
+- Follow **NestJS conventions** wherever possible.
+- Use the **CRUD Generator** instead of manual file creation.
+- Use **dayjs** for date manipulation instead of the JavaScript `Date` constructor.
+- Avoid directly using MikroORM's entity manager. Always create custom repositories that extend from `CustomSQLBaseRepository` class and use them. The only exception to this is if you're writing transactions or using the query builder.
+
+## Folder Structure
+
+Organize code under the `src/modules` folder, following this structure:
+
+```
+src
+├── app.module.ts
+├── common
+│   ├── aws
+│   ├── config
+│   ├── decorators
+│   ├── dtos
+│   ├── entities
+│   ├── enums
+│   ├── interceptors
+│   ├── interfaces
+│   ├── middleware
+│   ├── pipes
+│   ├── repository
+│   ├── serializers
+│   ├── types
+│   ├── validators
+│   └── websockets
+├── db
+│   ├── db.config.ts
+│   ├── migrations
+│   └── seeders
+├── modules
+│   ├── auth
+│   ├── emails
+│   ├── users
+│   └── verification-requests
+└── utils
+    ├── crypto-helper.ts
+    ├── datetime.ts
+    └── logger.ts
+```
+
+### Reusable Code
+
+- Check the **src/common** folder before creating decorators, pipes, or utilities.
+
+## Authentication & Authorization
+
+- Use **Passport.js** for authentication.
+- Use custom **decorators** for role-based authorization.
+
+## Separation of Concerns
+
+NestJS layers:
+
+- **Controller**: API layer
+- **Service**: Business logic
+- **Repository**: Data fetching
+- **Serializer**: Data transformation
+
+## ORM
+
+- Use **MikroORM**.
+- Entities go in `src/common/entities`.
+- All entities should extend `CustomBaseEntity`.
+- Define many-to-many relations on the owning side with `{ owner: true }`.
+
+### Repositories
+
+- Extend `CustomSQLBaseRepository`.
+- Place repositories inside their respective modules.
+- Avoid calling `flush()` inside repositories — call it in the service layer.
+
+## Serialization
+
+- Extend `AbstractBaseSerializer`.
+- Use MikroORM's serialization features.
+- Add custom serialization methods if needed.
+
+## Swagger Documentation
+
+- Use Swagger decorators.
+- Define controller return types using **Response** classes.
+- Add `@ApiProperty` to enum properties to prevent duplication. Do not add Swagger decorators to anything else.
+
+## Testing
+
+- Use **Vitest**.
+- Mock dependencies with `vitest-mock-extended`. Use `mockDeep` for classes with { funcPropSupport: true } param passed to it. This is an example:
+
+```ts
+const mockSomeTestService = mockDeep<SomeTestService>({ funcPropSupport: true });
+```
+
+- Write:
+  - Unit tests
+  - Integration tests
+  - E2E tests
+
+### Test Descriptions
+
+- Use the following structure:
+
+```ts
+describe("GET /vendors", () => {
+  it("returns OK(200) gets back exactly one vendor", () => {
+    request(httpServer).get("/vendors").expect(200);
+  });
+});
+```
+
+For integration tests, you need to follow what MikroORM docs say about init-ing entity managers.
+
+```ts
+describe("Integration Test", () => {
+  let service: TestService;
+  let orm: MikroORM;
+  let em: typeof orm.em;
+  let entityManager: EntityManager;
+
+  beforeAll(async () => {
+    orm = await MikroORM.init({
+      ...ormConfig,
+      debug: false,
+    });
+    const em = orm.em.fork();
+    const testRepository = em.getRepository(TestEntity);
+    const testRepository2 = em.getRepository(TestEntity2);
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        TestService,
+        TestRepository,
+        {
+          provide: TestRepository,
+          useValue: testRepository,
+        },
+        {
+          provide: TestRepository2,
+          useValue: testRepository2,
+        },
+      ],
+    }).compile();
+
+    service = module.get<TestService>(TestService);
+
+    entityManager = em.fork();
+  });
+
+  beforeAll(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true }).setSystemTime(new Date("2022-01-01"));
+  });
+
+  beforeEach(async () => {
+    em = orm.em.fork();
+    await orm.getSeeder().seed(TestSeeder);
+  });
+
+  afterEach(async () => {
+    await truncateTables(em);
+    vi.resetAllMocks();
+    em.clear();
+  });
+
+  afterAll(async () => {
+    await orm.close(true);
+    vi.useRealTimers();
+  });
+
+  describe("Test", () => {
+    it("should do something", () => {
+      expect(true).toBe(true);
+    });
+  });
+});
+```
+
+### Timezone Tests
+
+Use `mock-date.ts` utilities to simulate different timezones.
+
+## Naming Conventions
+
+| Type       | Naming Convention     | Example            |
+| ---------- | --------------------- | ------------------ |
+| Entities   | Singular              | `User`             |
+| Files      | Plural                | `users.entity.ts`  |
+| Classes    | PascalCase            | `UsersService`     |
+| DTOs       | [Action][Entity]Dto   | `CreateUserDto`    |
+| Responses  | PascalCase + Response | `UserResponse`     |
+| Interfaces | IPascalCase           | `IUser`            |
+| Types      | TPascalCase           | `TUser`            |
+| Enums      | EPascalCase           | `ERoles`           |
+| Constants  | SNAKE_CASE_CAPS       | `MAX_USERS`        |
+| Functions  | camelCase             | `helperFunction()` |
+
+## Final Notes
+
+- Always prioritize **reusability** and **modularity**.
+- Follow the **MikroORM** docs for complex queries and entity relations.
+- Write tests for every new functionality to ensure code quality and easier refactoring.

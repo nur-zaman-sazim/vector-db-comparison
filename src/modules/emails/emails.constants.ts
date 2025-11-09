@@ -1,0 +1,1 @@
+export const EMAIL_SERVICE_TOKEN = Symbol("EMAIL_SERVICE_TOKEN");

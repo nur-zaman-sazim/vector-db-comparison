@@ -1,0 +1,38 @@
+name: "Setup NVM and Node.js"
+description: "Setup Node.js using NVM based on .nvmrc file"
+outputs:
+  node-version:
+    description: "This action sets up Node.js using NVM based on the version specified in the .nvmrc file. If the required Node.js version is not already installed, it will be downloaded and configured using NVM."
+    value: ${{ steps.setup-node.outputs.node-version }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: setup-node
+      shell: bash
+      run: |
+        source "$HOME/.nvm/nvm.sh" || echo "Failed to source NVM"
+
+        echo "Checking if NVM is available..."
+        command -v nvm || echo "NVM command not found"
+
+        NODE_VERSION=$(cat .nvmrc)
+        echo "Required Node version: $NODE_VERSION"
+
+        if ! nvm use "$NODE_VERSION" 2>/dev/null; then
+          echo "Installing Node.js version $NODE_VERSION"
+          nvm install "$NODE_VERSION"
+          nvm use "$NODE_VERSION"
+        fi
+
+        if ! command -v yarn &> /dev/null; then
+          echo "Installing yarn..."
+          npm install -g yarn
+          export PATH="$(npm config get prefix)/bin:$PATH"
+        fi
+        echo "Yarn version: $(yarn --version)"
+
+        echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
+
+        echo "node-version=$(node --version)" >> $GITHUB_OUTPUT
+        echo "Using Node.js $(node --version)"

@@ -1,0 +1,7 @@
+dist/*
+logs/*
+*.log
+.idea/*
+.vscode/*
+coverage
+README.md

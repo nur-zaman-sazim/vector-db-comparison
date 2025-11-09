@@ -1,0 +1,39 @@
+name: "Cache Dependencies"
+description: "Restore and save cache for yarn dependencies"
+
+inputs:
+  operation:
+    description: "Operation to perform (restore or save)"
+    required: true
+    type: string
+  job-type:
+    description: "Type of job (test, lint)"
+    required: true
+    type: string
+
+outputs:
+  cache-hit:
+    description: "Whether there was a cache hit"
+    value: ${{ steps.yarn-cache.outputs.cache-hit }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Restore yarn dependencies
+      if: inputs.operation == 'restore'
+      id: yarn-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          node_modules
+        key: ${{ runner.os }}-yarn-deps-${{ inputs.job-type }}-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-yarn-deps-${{ inputs.job-type }}-
+
+    - name: Save yarn cache
+      if: inputs.operation == 'save' && steps.yarn-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          node_modules
+        key: ${{ runner.os }}-yarn-deps-${{ inputs.job-type }}-${{ hashFiles('**/yarn.lock') }}

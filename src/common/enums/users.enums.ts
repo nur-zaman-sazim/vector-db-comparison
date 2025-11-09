@@ -1,0 +1,5 @@
+export enum EUserState {
+  UNREGISTERED = "UNREGISTERED",
+  ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE",
+}

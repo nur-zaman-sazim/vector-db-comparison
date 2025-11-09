@@ -1,0 +1,91 @@
+name: Tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: E2E and Unit Tests
+    runs-on: self-hosted
+
+    env:
+      NODE_ENV: test
+      STAGE_ENV: test
+      JWT_SECRET: secret
+      JWT_TOKEN_LIFETIME: 24h
+      AWS_S3_REGION: us-east-1
+      AWS_S3_BUCKET_NAME: project-dev-bucket
+      AWS_S3_PRESIGN_URL_EXPIRY_IN_MINUTES: 5
+      SENDGRID_API_KEY: SG.xxxxx
+      YARN_CACHE_FOLDER: ${{ github.workspace }}/tests/.yarn-cache
+      ENABLE_AUDIT_LOGGING: true
+      GOOGLE_CLIENT_ID: xxxxx
+      GOOGLE_CLIENT_SECRET: xxxxx
+      WEB_CLIENT_BASE_URL: http://localhost:3000
+      SEND_FROM_EMAIL: test@example.com
+
+    steps:
+      - name: Clean workspace
+        run: rm -rf *
+
+      - name: Generate Dynamic Ports
+        id: dynamic-env
+        run: |
+          echo "BE_PORT=$(shuf -i 3000-3999 -n 1)" >> $GITHUB_ENV
+          echo "BE_WS_PORT=$(shuf -i 7000-7999 -n 1)" >> $GITHUB_ENV
+          echo "DB_PORT=$(shuf -i 4000-4999 -n 1)" >> $GITHUB_ENV
+          echo "S3_PORT=$(shuf -i 6000-6999 -n 1)" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-nvm
+
+      - name: Restore caches
+        uses: ./.github/actions/cache-deps
+        with:
+          operation: restore
+          job-type: test
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --prefer-offline
+
+      - name: Save caches
+        uses: ./.github/actions/cache-deps
+        with:
+          operation: save
+          job-type: test
+
+      - name: Setup Database Service
+        run: |
+          docker run --name project_test_db_${{ github.run_id }} \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=project_test_db \
+            -p $DB_PORT:5432 \
+            --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5 \
+            -d postgres:14
+
+      - name: Set Dynamic Environment Variables
+        run: |
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:$DB_PORT/project_test_db?schema=public" >> $GITHUB_ENV
+          echo "AWS_S3_ENDPOINT=http://localhost:$S3_PORT" >> $GITHUB_ENV
+          echo "AWS_S3_BUCKET_URL=http://localhost:$S3_PORT" >> $GITHUB_ENV
+          echo "API_HEALTH_URL=http://localhost:$BE_PORT/api/v1/health" >> $GITHUB_ENV
+
+      - name: Run database migrations
+        run: yarn db:migration:fresh:ci
+
+      - name: Run E2E tests
+        run: yarn test:e2e
+
+      - name: Run Unit tests
+        run: yarn test
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f project_test_db_${{ github.run_id }} || true
+          rm -rf *
