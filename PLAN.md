@@ -1,8 +1,8 @@
-# Vector Database Benchmarking Plan
+# Vector Database Benchmarking Implementation Plan
 
 ## Executive Summary
 
-This document outlines a comprehensive benchmarking plan for five vector databases: **PGVector**, **ChromaDB**, **Milvus**, **Qdrant**, and **LanceDB**. Each phase implements one database with standardized testing methodology to enable apples-to-apples comparison across key metrics: query latency (P50/P99), throughput (QPS), hybrid search performance, memory efficiency, indexing speed, and operational complexity.
+This document outlines a comprehensive benchmarking implementation for five vector databases: **PGVector**, **ChromaDB**, **Milvus**, **Qdrant**, and **LanceDB**. Each phase implements one database with standardized testing methodology to enable apples-to-apples comparison across key metrics: query latency (P50/P99), throughput (QPS), hybrid search performance, memory efficiency, indexing speed, and operational complexity.
 
 ## Objectives
 
@@ -12,481 +12,567 @@ This document outlines a comprehensive benchmarking plan for five vector databas
 4. **Measure real-world RAG patterns**: vector search, hybrid search, metadata filtering, reranking
 5. **Capture operational metrics**: setup complexity, monitoring, resource consumption
 
+## Project Structure
+
+Following the existing NestJS conventions in this codebase:
+
+```
+src/
+├── modules/
+│   ├── vector-benchmarks/          # Main benchmark module
+│   │   ├── vector-benchmarks.module.ts
+│   │   ├── vector-benchmarks.controller.ts
+│   │   ├── vector-benchmarks.service.ts
+│   │   ├── vector-benchmarks.dtos.ts
+│   │   ├── vector-benchmarks.constants.ts
+│   │   ├── vector-benchmarks.enums.ts
+│   │   ├── interfaces/
+│   │   │   └── benchmark-result.interface.ts
+│   │   ├── databases/                # Database implementations
+│   │   │   ├── pgvector/
+│   │   │   │   ├── pgvector.module.ts
+│   │   │   │   ├── pgvector.service.ts
+│   │   │   │   ├── pgvector.config.ts
+│   │   │   │   └── pgvector.repository.ts
+│   │   │   ├── chromadb/
+│   │   │   │   ├── chromadb.module.ts
+│   │   │   │   ├── chromadb.service.ts
+│   │   │   │   └── chromadb.config.ts
+│   │   │   ├── milvus/
+│   │   │   │   ├── milvus.module.ts
+│   │   │   │   ├── milvus.service.ts
+│   │   │   │   └── milvus.config.ts
+│   │   │   ├── qdrant/
+│   │   │   │   ├── qdrant.module.ts
+│   │   │   │   ├── qdrant.service.ts
+│   │   │   │   └── qdrant.config.ts
+│   │   │   └── lancedb/
+│   │   │       ├── lancedb.module.ts
+│   │   │       ├── lancedb.service.ts
+│   │   │       └── lancedb.config.ts
+│   │   ├── benchmarks/               # Benchmark test implementations
+│   │   │   ├── latency.benchmark.ts
+│   │   │   ├── throughput.benchmark.ts
+│   │   │   ├── hybrid-search.benchmark.ts
+│   │   │   ├── filtering.benchmark.ts
+│   │   │   ├── indexing.benchmark.ts
+│   │   │   └── concurrent-load.benchmark.ts
+│   │   ├── data-generators/          # Test data generation
+│   │   │   ├── embedding-generator.service.ts
+│   │   │   ├── dataset-loader.service.ts
+│   │   │   └── query-generator.service.ts
+│   │   ├── reporters/                # Results reporting
+│   │   │   ├── console-reporter.service.ts
+│   │   │   ├── json-reporter.service.ts
+│   │   │   ├── csv-reporter.service.ts
+│   │   │   └── markdown-reporter.service.ts
+│   │   └── __tests__/
+│   │       ├── vector-benchmarks.service.spec.ts
+│   │       └── databases/
+│   │           ├── pgvector.service.spec.ts
+│   │           ├── chromadb.service.spec.ts
+│   │           ├── milvus.service.spec.ts
+│   │           ├── qdrant.service.spec.ts
+│   │           └── lancedb.service.spec.ts
+│   └── documents/                    # Document entity for benchmarking
+│       ├── documents.module.ts
+│       ├── documents.entity.ts
+│       └── documents.repository.ts
+├── common/
+│   └── interfaces/
+│       └── environment-variables.interface.ts  # Add vector DB env vars
+└── db/
+    └── migrations/
+        └── Migration*_add_vector_benchmarks.ts
+```
+
 ## Benchmarking Methodology
 
-### Test Environment Specifications
+### Test Environment
 
-**Hardware Profile**:
-- **CPU**: 8-core minimum (16-core recommended for distributed tests)
-- **RAM**: 64GB minimum (128GB for 50M vector tests)
-- **Storage**: NVMe SSD with 500GB+ capacity
-- **Network**: Gigabit ethernet (10Gbit for distributed tests)
+**Hardware Assumptions**:
+- Multi-core CPU (actual cores will be detected at runtime)
+- Sufficient RAM for vector operations (will be measured)
+- SSD storage
+- Docker support for database containers
 
 **Software Stack**:
-- **OS**: Ubuntu 22.04 LTS
-- **Node.js**: v20.x LTS
-- **TypeScript**: 5.x
-- **Docker**: 24.x with Docker Compose v2
-- **Monitoring**: Prometheus + Grafana for metrics collection
+- Node.js v20 (already configured)
+- TypeScript
+- NestJS (existing framework)
+- MikroORM (for PGVector integration)
+- Docker Compose (for database containers)
+- Vitest (for testing)
 
 ### Standard Test Dataset
 
-**Primary Dataset - OpenAI Embeddings**:
-- **Dimensions**: 1536 (text-embedding-3-small)
-- **Vector Counts**: 100K, 1M, 10M, 50M
-- **Source**: Wikipedia articles, arXiv papers, Stack Overflow posts
-- **Metadata Schema**:
-  ```typescript
-  {
-    id: string;
-    text: string;
-    embedding: number[]; // 1536-dim
-    metadata: {
-      source: string;
-      category: string;
-      author: string;
-      created_at: Date;
-      word_count: number;
-      tags: string[];
-    }
-  }
-  ```
+**Document Schema**:
+```typescript
+export interface BenchmarkDocument {
+  id: string;
+  text: string;
+  embedding: number[]; // 1536-dim (OpenAI) or 768-dim (Sentence Transformers)
+  metadata: {
+    source: string;
+    category: string;
+    author: string;
+    created_at: Date;
+    word_count: number;
+    tags: string[];
+  };
+}
+```
 
-**Secondary Dataset - Sentence Transformers**:
-- **Dimensions**: 768 (all-MiniLM-L6-v2)
-- **Vector Count**: 1M
-- **Purpose**: Compare performance across embedding dimensions
+**Dataset Sizes**: 100K, 1M, 10M, 50M vectors
+**Embedding Dimensions**: 1536 (OpenAI), 768 (Sentence Transformers)
 
 ### Core Benchmark Tests
 
-#### Test 1: Vector Similarity Search (Baseline)
-- **Query Type**: Pure cosine similarity / L2 distance
-- **Parameters**:
-  - Top-K: 10, 50, 100
-  - Recall Target: 95%, 99%
-- **Metrics**: P50/P99 latency, QPS (1/10/100 concurrent clients)
+All benchmarks will be implemented as services following NestJS patterns:
+
+#### Test 1: Vector Similarity Search
+- Pure cosine similarity / L2 distance
+- Top-K: 10, 50, 100
+- Recall Target: 95%, 99%
+- Metrics: P50/P99 latency, QPS (1/10/100 concurrent clients)
 
 #### Test 2: Metadata Filtering
-- **Query Type**: Vector search with payload/metadata filters
-- **Filter Selectivity**: 1%, 10%, 50%, 90%
-- **Patterns**:
-  - Single condition: `source = "wikipedia"`
-  - Range filter: `word_count > 500 AND word_count < 2000`
-  - Multi-condition: `category IN ["tech", "science"] AND created_at > "2024-01-01"`
-- **Metrics**: Latency overhead vs. baseline, recall degradation
+- Filter Selectivity: 1%, 10%, 50%, 90%
+- Single condition, range filter, multi-condition
+- Metrics: Latency overhead vs baseline, recall degradation
 
-#### Test 3: Hybrid Search (Vector + BM25)
-- **Query Type**: Combined dense vector + sparse keyword search
-- **Fusion Methods**: Reciprocal Rank Fusion (RRF), weighted combination
-- **Parameters**: Alpha weights [0.3, 0.5, 0.7]
-- **Metrics**: End-to-end latency, result quality (NDCG@10)
+#### Test 3: Hybrid Search
+- Vector + BM25 keyword search
+- Fusion: RRF, weighted combination
+- Alpha weights: [0.3, 0.5, 0.7]
+- Metrics: End-to-end latency, result quality (NDCG@10)
 
 #### Test 4: Reranking Pipeline
-- **Pattern**: Retrieve 50 → Rerank to 10
-- **Reranker**: ColBERT or cross-encoder simulation
-- **Metrics**: Total pipeline latency, accuracy improvement
+- Pattern: Retrieve 50 → Rerank to 10
+- Metrics: Total pipeline latency, accuracy improvement
 
 #### Test 5: Indexing Performance
-- **Operations**:
-  - Bulk insert (100K vectors)
-  - Incremental insert (1K vectors/batch)
-  - Index rebuild time
-- **Metrics**: Insertion throughput (vectors/sec), index build time, memory consumption
+- Bulk insert (100K vectors)
+- Incremental insert (1K vectors/batch)
+- Index rebuild time
+- Metrics: Insertion throughput, index build time, memory consumption
 
 #### Test 6: Concurrent Load Testing
-- **Pattern**: Simulate production traffic
-- **Load Profiles**:
-  - Sustained: 100 QPS for 10 minutes
-  - Burst: Spike to 500 QPS for 30 seconds
-  - Mixed: 70% reads, 20% writes, 10% deletes
-- **Metrics**: Latency percentiles under load, error rates, resource saturation
+- Sustained: 100 QPS for 10 minutes
+- Burst: Spike to 500 QPS for 30 seconds
+- Mixed: 70% reads, 20% writes, 10% deletes
+- Metrics: Latency percentiles under load, error rates
 
-### Measurement Tools & Instrumentation
+---
 
-**Performance Testing Framework**:
+## Phase 1: Infrastructure & Common Components
+
+### 1.1 Module Structure Setup
+
+**Create base benchmark module**:
+
 ```typescript
-// Benchmark harness structure
-interface BenchmarkConfig {
+// src/modules/vector-benchmarks/vector-benchmarks.module.ts
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { VectorBenchmarksController } from './vector-benchmarks.controller';
+import { VectorBenchmarksService } from './vector-benchmarks.service';
+import { DataGeneratorModule } from './data-generators/data-generator.module';
+import { ReporterModule } from './reporters/reporter.module';
+
+@Module({
+  imports: [ConfigModule, DataGeneratorModule, ReporterModule],
+  controllers: [VectorBenchmarksController],
+  providers: [VectorBenchmarksService],
+  exports: [VectorBenchmarksService],
+})
+export class VectorBenchmarksModule {}
+```
+
+### 1.2 Type Definitions & Interfaces
+
+**Benchmark configuration and results**:
+
+```typescript
+// src/modules/vector-benchmarks/interfaces/benchmark-result.interface.ts
+export interface BenchmarkConfig {
   database: 'pgvector' | 'chromadb' | 'milvus' | 'qdrant' | 'lancedb';
   vectorCount: number;
   dimensions: number;
   concurrency: number;
   duration: number; // seconds
   queryType: 'similarity' | 'filter' | 'hybrid';
+  topK: number;
+  recallTarget: number;
 }
 
-interface BenchmarkResult {
-  latencyP50: number;
-  latencyP90: number;
-  latencyP99: number;
-  qps: number;
-  recall: number;
-  memoryUsedMB: number;
-  cpuUtilization: number;
-  errors: number;
+export interface BenchmarkResult {
+  database: string;
+  testName: string;
+  timestamp: Date;
+  config: BenchmarkConfig;
+  metrics: {
+    latencyP50: number;
+    latencyP90: number;
+    latencyP99: number;
+    latencyMean: number;
+    qps: number;
+    recall: number;
+    memoryUsedMB: number;
+    cpuUtilization: number;
+    errors: number;
+    totalQueries: number;
+  };
+}
+
+export interface VectorDatabaseService {
+  initialize(): Promise<void>;
+  createCollection(name: string, dimensions: number): Promise<void>;
+  insertVectors(documents: BenchmarkDocument[]): Promise<void>;
+  vectorSearch(query: number[], limit: number): Promise<SearchResult[]>;
+  filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]>;
+  hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]>;
+  deleteCollection(name: string): Promise<void>;
+  getStats(): Promise<DatabaseStats>;
+}
+
+export interface SearchResult {
+  id: string;
+  score: number;
+  document?: BenchmarkDocument;
+}
+
+export interface DatabaseStats {
+  vectorCount: number;
+  indexSize: number;
+  memoryUsage: number;
 }
 ```
 
-**Metrics Collection**:
-- **Application-level**: Custom TypeScript benchmarking suite with `perf_hooks`
-- **System-level**: Prometheus exporters for each database
-- **Resource monitoring**: Docker stats, cAdvisor
+### 1.3 Enums & Constants
 
----
+```typescript
+// src/modules/vector-benchmarks/vector-benchmarks.enums.ts
+export enum DatabaseType {
+  PGVECTOR = 'pgvector',
+  CHROMADB = 'chromadb',
+  MILVUS = 'milvus',
+  QDRANT = 'qdrant',
+  LANCEDB = 'lancedb',
+}
 
-## Phase 1: PGVector Implementation
+export enum BenchmarkType {
+  LATENCY = 'latency',
+  THROUGHPUT = 'throughput',
+  HYBRID_SEARCH = 'hybrid_search',
+  FILTERING = 'filtering',
+  INDEXING = 'indexing',
+  CONCURRENT_LOAD = 'concurrent_load',
+}
 
-**Goal**: Establish baseline with PostgreSQL + pgvector extension, leveraging existing RDBMS infrastructure.
+// src/modules/vector-benchmarks/vector-benchmarks.constants.ts
+export const BENCHMARK_CONSTANTS = {
+  DEFAULT_DIMENSIONS: 1536,
+  DEFAULT_VECTOR_COUNT: 100000,
+  DEFAULT_TOP_K: 10,
+  DEFAULT_RECALL_TARGET: 0.99,
+  DEFAULT_CONCURRENCY: 10,
+  COLLECTION_PREFIX: 'benchmark_',
+};
+```
 
-### 1.1 Infrastructure Setup
+### 1.4 Data Generation Services
 
-**Docker Compose Configuration**:
+```typescript
+// src/modules/vector-benchmarks/data-generators/embedding-generator.service.ts
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class EmbeddingGeneratorService {
+  generateRandomVector(dimensions: number): number[] {
+    const vector = new Array(dimensions);
+    for (let i = 0; i < dimensions; i++) {
+      vector[i] = Math.random() * 2 - 1; // Range: [-1, 1]
+    }
+    return this.normalize(vector);
+  }
+
+  generateRandomVectors(count: number, dimensions: number): number[][] {
+    const vectors: number[][] = [];
+    for (let i = 0; i < count; i++) {
+      vectors.push(this.generateRandomVector(dimensions));
+    }
+    return vectors;
+  }
+
+  private normalize(vector: number[]): number[] {
+    const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+    return vector.map(val => val / magnitude);
+  }
+}
+
+// src/modules/vector-benchmarks/data-generators/dataset-loader.service.ts
+import { Injectable } from '@nestjs/common';
+import { EmbeddingGeneratorService } from './embedding-generator.service';
+
+@Injectable()
+export class DatasetLoaderService {
+  constructor(private embeddingGenerator: EmbeddingGeneratorService) {}
+
+  async generateBenchmarkDataset(
+    count: number,
+    dimensions: number,
+  ): Promise<BenchmarkDocument[]> {
+    const documents: BenchmarkDocument[] = [];
+    const categories = ['tech', 'science', 'health', 'business', 'sports'];
+    const sources = ['wikipedia', 'arxiv', 'stackoverflow', 'medium', 'blogs'];
+
+    for (let i = 0; i < count; i++) {
+      documents.push({
+        id: `doc_${i}`,
+        text: this.generateRandomText(),
+        embedding: this.embeddingGenerator.generateRandomVector(dimensions),
+        metadata: {
+          source: sources[Math.floor(Math.random() * sources.length)],
+          category: categories[Math.floor(Math.random() * categories.length)],
+          author: `author_${Math.floor(Math.random() * 100)}`,
+          created_at: new Date(),
+          word_count: Math.floor(Math.random() * 2000) + 100,
+          tags: this.generateRandomTags(),
+        },
+      });
+
+      // Log progress for large datasets
+      if ((i + 1) % 10000 === 0) {
+        console.log(`Generated ${i + 1}/${count} documents`);
+      }
+    }
+
+    return documents;
+  }
+
+  private generateRandomText(): string {
+    const words = ['vector', 'database', 'search', 'embedding', 'semantic',
+                   'query', 'index', 'performance', 'benchmark', 'test'];
+    const length = Math.floor(Math.random() * 50) + 10;
+    return Array.from({ length }, () =>
+      words[Math.floor(Math.random() * words.length)]
+    ).join(' ');
+  }
+
+  private generateRandomTags(): string[] {
+    const allTags = ['ml', 'ai', 'nlp', 'cv', 'rag', 'llm', 'data', 'analytics'];
+    const count = Math.floor(Math.random() * 3) + 1;
+    return Array.from({ length: count }, () =>
+      allTags[Math.floor(Math.random() * allTags.length)]
+    );
+  }
+}
+```
+
+### 1.5 Base Benchmark Runner
+
+```typescript
+// src/modules/vector-benchmarks/benchmarks/base.benchmark.ts
+import { Injectable } from '@nestjs/common';
+import { performance } from 'perf_hooks';
+
+@Injectable()
+export abstract class BaseBenchmark {
+  protected calculatePercentile(values: number[], percentile: number): number {
+    const sorted = [...values].sort((a, b) => a - b);
+    const index = Math.ceil(sorted.length * percentile) - 1;
+    return sorted[Math.max(0, index)];
+  }
+
+  protected calculateMean(values: number[]): number {
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+
+  protected async measureLatency<T>(
+    fn: () => Promise<T>,
+  ): Promise<{ result: T; latency: number }> {
+    const start = performance.now();
+    const result = await fn();
+    const latency = performance.now() - start;
+    return { result, latency };
+  }
+
+  protected async runConcurrent<T>(
+    tasks: (() => Promise<T>)[],
+    concurrency: number,
+  ): Promise<T[]> {
+    const results: T[] = [];
+    for (let i = 0; i < tasks.length; i += concurrency) {
+      const batch = tasks.slice(i, i + concurrency);
+      const batchResults = await Promise.all(batch.map(task => task()));
+      results.push(...batchResults);
+    }
+    return results;
+  }
+
+  protected getSystemStats(): { cpuUsage: number; memoryUsage: number } {
+    const usage = process.cpuUsage();
+    const memUsage = process.memoryUsage();
+
+    return {
+      cpuUsage: (usage.user + usage.system) / 1000000, // Convert to seconds
+      memoryUsage: memUsage.heapUsed / 1024 / 1024, // Convert to MB
+    };
+  }
+}
+```
+
+### 1.6 Reporter Services
+
+```typescript
+// src/modules/vector-benchmarks/reporters/json-reporter.service.ts
+import { Injectable } from '@nestjs/common';
+import { writeFile } from 'fs/promises';
+import { join } from 'path';
+
+@Injectable()
+export class JsonReporterService {
+  async saveResults(results: BenchmarkResult[], filename: string): Promise<void> {
+    const outputPath = join(process.cwd(), 'benchmark-results', filename);
+    await writeFile(outputPath, JSON.stringify(results, null, 2));
+    console.log(`Results saved to: ${outputPath}`);
+  }
+
+  async loadResults(filename: string): Promise<BenchmarkResult[]> {
+    const inputPath = join(process.cwd(), 'benchmark-results', filename);
+    const data = await readFile(inputPath, 'utf-8');
+    return JSON.parse(data);
+  }
+}
+
+// src/modules/vector-benchmarks/reporters/markdown-reporter.service.ts
+import { Injectable } from '@nestjs/common';
+import { writeFile } from 'fs/promises';
+import { join } from 'path';
+
+@Injectable()
+export class MarkdownReporterService {
+  async generateReport(results: BenchmarkResult[]): Promise<string> {
+    let markdown = '# Vector Database Benchmark Results\n\n';
+    markdown += `Generated: ${new Date().toISOString()}\n\n`;
+
+    // Group by database
+    const byDatabase = this.groupBy(results, 'database');
+
+    for (const [database, dbResults] of Object.entries(byDatabase)) {
+      markdown += `## ${database}\n\n`;
+
+      // Group by test type
+      const byTest = this.groupBy(dbResults, 'testName');
+
+      for (const [testName, testResults] of Object.entries(byTest)) {
+        markdown += `### ${testName}\n\n`;
+        markdown += this.generateTable(testResults);
+        markdown += '\n\n';
+      }
+    }
+
+    return markdown;
+  }
+
+  async saveReport(results: BenchmarkResult[], filename: string): Promise<void> {
+    const markdown = await this.generateReport(results);
+    const outputPath = join(process.cwd(), 'benchmark-results', filename);
+    await writeFile(outputPath, markdown);
+    console.log(`Report saved to: ${outputPath}`);
+  }
+
+  private generateTable(results: BenchmarkResult[]): string {
+    let table = '| Vector Count | P50 (ms) | P99 (ms) | QPS | Recall | Memory (MB) |\n';
+    table += '|--------------|----------|----------|-----|--------|-------------|\n';
+
+    for (const result of results) {
+      table += `| ${result.config.vectorCount} | `;
+      table += `${result.metrics.latencyP50.toFixed(2)} | `;
+      table += `${result.metrics.latencyP99.toFixed(2)} | `;
+      table += `${result.metrics.qps.toFixed(2)} | `;
+      table += `${(result.metrics.recall * 100).toFixed(2)}% | `;
+      table += `${result.metrics.memoryUsedMB.toFixed(2)} |\n`;
+    }
+
+    return table;
+  }
+
+  private groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
+    return array.reduce((groups, item) => {
+      const value = String(item[key]);
+      groups[value] = groups[value] || [];
+      groups[value].push(item);
+      return groups;
+    }, {} as Record<string, T[]>);
+  }
+}
+```
+
+### 1.7 Environment Variables
+
+Add to `src/common/interfaces/environment-variables.interface.ts`:
+
+```typescript
+// Vector Database Configuration
+PGVECTOR_HOST?: string;
+PGVECTOR_PORT?: number;
+PGVECTOR_DATABASE?: string;
+PGVECTOR_USER?: string;
+PGVECTOR_PASSWORD?: string;
+
+CHROMADB_URL?: string;
+
+MILVUS_HOST?: string;
+MILVUS_PORT?: number;
+
+QDRANT_URL?: string;
+QDRANT_API_KEY?: string;
+
+LANCEDB_URI?: string;
+
+// Benchmark Configuration
+BENCHMARK_VECTOR_COUNT?: number;
+BENCHMARK_DIMENSIONS?: number;
+BENCHMARK_CONCURRENCY?: number;
+```
+
+### 1.8 Docker Compose for Databases
+
+Create `docker-compose.benchmarks.yml`:
+
 ```yaml
+version: '3.8'
+
 services:
-  postgres:
+  # PGVector
+  pgvector:
     image: pgvector/pgvector:pg16
+    container_name: benchmark_pgvector
     environment:
-      POSTGRES_DB: vector_benchmark
-      POSTGRES_USER: bench_user
-      POSTGRES_PASSWORD: bench_pass
+      POSTGRES_DB: benchmark_db
+      POSTGRES_USER: benchmark_user
+      POSTGRES_PASSWORD: benchmark_pass
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    shm_size: 1g
+      - pgvector_data:/var/lib/postgresql/data
     command:
       - postgres
       - -c
-      - shared_buffers=8GB
+      - shared_buffers=2GB
       - -c
-      - effective_cache_size=24GB
+      - effective_cache_size=6GB
       - -c
-      - maintenance_work_mem=4GB
+      - maintenance_work_mem=1GB
       - -c
-      - max_parallel_maintenance_workers=8
-```
+      - max_parallel_maintenance_workers=4
 
-**PostgreSQL Configuration Tuning**:
-- `shared_buffers`: 25% of RAM
-- `effective_cache_size`: 75% of RAM
-- `maintenance_work_mem`: 2-4GB for index builds
-- `max_parallel_maintenance_workers`: Match CPU cores
-- `work_mem`: 256MB per connection
-
-### 1.2 Schema Design & Indexing
-
-**Table Schema**:
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-
-CREATE TABLE documents (
-    id SERIAL PRIMARY KEY,
-    text TEXT NOT NULL,
-    embedding vector(1536),
-    metadata JSONB,
-    source VARCHAR(255),
-    category VARCHAR(100),
-    created_at TIMESTAMP DEFAULT NOW(),
-    word_count INTEGER,
-    tsvector_content tsvector -- For full-text search
-);
-
--- Create GIN index for JSONB metadata
-CREATE INDEX idx_metadata ON documents USING GIN (metadata);
-
--- Create index for common filters
-CREATE INDEX idx_source ON documents(source);
-CREATE INDEX idx_category ON documents(category);
-CREATE INDEX idx_created_at ON documents(created_at);
-
--- Full-text search index
-CREATE INDEX idx_tsvector ON documents USING GIN (tsvector_content);
-```
-
-**Vector Index Strategies**:
-```sql
--- HNSW index (default for high-recall scenarios)
-CREATE INDEX ON documents USING hnsw (embedding vector_cosine_ops)
-WITH (m = 16, ef_construction = 64);
-
--- IVFFlat index (faster build, lower recall)
-CREATE INDEX ON documents USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 100);
-
--- Test with halfvec quantization (v0.8.1+)
-ALTER TABLE documents ADD COLUMN embedding_half halfvec(1536);
-CREATE INDEX ON documents USING hnsw (embedding_half halfvec_cosine_ops);
-```
-
-### 1.3 NestJS Integration Module
-
-**Module Structure**:
-```typescript
-// src/databases/pgvector/pgvector.module.ts
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { PgVectorService } from './pgvector.service';
-
-@Module({
-  imports: [ConfigModule],
-  providers: [PgVectorService],
-  exports: [PgVectorService],
-})
-export class PgVectorModule {}
-```
-
-**Service Implementation**:
-```typescript
-// src/databases/pgvector/pgvector.service.ts
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { Pool } from 'pg';
-import pgvector from 'pgvector/pg';
-
-@Injectable()
-export class PgVectorService implements OnModuleInit {
-  private pool: Pool;
-
-  async onModuleInit() {
-    await pgvector.registerType(this.pool);
-  }
-
-  async vectorSearch(query: number[], limit: number, recall: number = 0.99) {
-    const client = await this.pool.connect();
-    try {
-      // Dynamic ef_search based on recall target
-      const efSearch = this.calculateEfSearch(recall, limit);
-      await client.query(`SET hnsw.ef_search = ${efSearch}`);
-
-      const result = await client.query(
-        `SELECT id, text, metadata, embedding <=> $1 AS distance
-         FROM documents
-         ORDER BY embedding <=> $1
-         LIMIT $2`,
-        [pgvector.toSql(query), limit]
-      );
-      return result.rows;
-    } finally {
-      client.release();
-    }
-  }
-
-  async hybridSearch(
-    queryVector: number[],
-    queryText: string,
-    limit: number,
-    alpha: number = 0.5
-  ) {
-    // Combine vector similarity + full-text search
-    const query = `
-      WITH vector_results AS (
-        SELECT id, embedding <=> $1 AS vec_distance
-        FROM documents
-        ORDER BY vec_distance
-        LIMIT 50
-      ),
-      text_results AS (
-        SELECT id, ts_rank(tsvector_content, to_tsquery($2)) AS text_rank
-        FROM documents
-        WHERE tsvector_content @@ to_tsquery($2)
-        ORDER BY text_rank DESC
-        LIMIT 50
-      )
-      SELECT d.*,
-             COALESCE(vr.vec_distance, 1) AS vec_dist,
-             COALESCE(tr.text_rank, 0) AS txt_rank,
-             ($3 / (60 + ROW_NUMBER() OVER (ORDER BY vr.vec_distance))) +
-             ((1 - $3) / (60 + ROW_NUMBER() OVER (ORDER BY tr.text_rank DESC))) AS rrf_score
-      FROM documents d
-      LEFT JOIN vector_results vr ON d.id = vr.id
-      LEFT JOIN text_results tr ON d.id = tr.id
-      WHERE vr.id IS NOT NULL OR tr.id IS NOT NULL
-      ORDER BY rrf_score DESC
-      LIMIT $4;
-    `;
-
-    const result = await this.pool.query(query, [
-      pgvector.toSql(queryVector),
-      queryText.split(' ').join(' & '),
-      alpha,
-      limit
-    ]);
-    return result.rows;
-  }
-
-  async filteredSearch(
-    queryVector: number[],
-    filters: Record<string, any>,
-    limit: number
-  ) {
-    // Build dynamic WHERE clause from filters
-    const whereClauses = Object.entries(filters).map(([key, value], idx) =>
-      `${key} = $${idx + 2}`
-    );
-
-    const query = `
-      SELECT id, text, metadata, embedding <=> $1 AS distance
-      FROM documents
-      WHERE ${whereClauses.join(' AND ')}
-      ORDER BY embedding <=> $1
-      LIMIT $${whereClauses.length + 2}
-    `;
-
-    const params = [
-      pgvector.toSql(queryVector),
-      ...Object.values(filters),
-      limit
-    ];
-
-    const result = await this.pool.query(query, params);
-    return result.rows;
-  }
-
-  private calculateEfSearch(recall: number, limit: number): number {
-    // Heuristic: higher recall requires larger ef_search
-    if (recall >= 0.99) return Math.max(limit * 4, 200);
-    if (recall >= 0.95) return Math.max(limit * 2, 100);
-    return Math.max(limit, 40);
-  }
-}
-```
-
-### 1.4 Benchmark Test Suite
-
-**Test Runner**:
-```typescript
-// src/benchmarks/pgvector.benchmark.ts
-import { performance } from 'perf_hooks';
-
-export class PgVectorBenchmark {
-  constructor(private pgVectorService: PgVectorService) {}
-
-  async runLatencyTest(
-    queryVectors: number[][],
-    topK: number,
-    recall: number
-  ): Promise<BenchmarkResult> {
-    const latencies: number[] = [];
-
-    for (const vector of queryVectors) {
-      const start = performance.now();
-      await this.pgVectorService.vectorSearch(vector, topK, recall);
-      const end = performance.now();
-      latencies.push(end - start);
-    }
-
-    return {
-      latencyP50: this.percentile(latencies, 0.5),
-      latencyP90: this.percentile(latencies, 0.9),
-      latencyP99: this.percentile(latencies, 0.99),
-      qps: queryVectors.length / (latencies.reduce((a, b) => a + b) / 1000),
-      recall: recall,
-      // Additional metrics collected via monitoring
-    };
-  }
-
-  async runThroughputTest(
-    queryVectors: number[][],
-    concurrency: number,
-    duration: number
-  ): Promise<number> {
-    const startTime = Date.now();
-    let completedQueries = 0;
-
-    const workers = Array.from({ length: concurrency }, async () => {
-      while (Date.now() - startTime < duration * 1000) {
-        const randomVector = queryVectors[
-          Math.floor(Math.random() * queryVectors.length)
-        ];
-        await this.pgVectorService.vectorSearch(randomVector, 10);
-        completedQueries++;
-      }
-    });
-
-    await Promise.all(workers);
-    return completedQueries / duration;
-  }
-
-  private percentile(arr: number[], p: number): number {
-    const sorted = arr.slice().sort((a, b) => a - b);
-    const index = Math.ceil(sorted.length * p) - 1;
-    return sorted[index];
-  }
-}
-```
-
-### 1.5 Data Ingestion Pipeline
-
-**Batch Insert Strategy**:
-```typescript
-async bulkInsert(documents: Document[], batchSize: number = 1000) {
-  const chunks = this.chunkArray(documents, batchSize);
-
-  for (const chunk of chunks) {
-    const values = chunk.map((doc, idx) => {
-      const base = idx * 6;
-      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`;
-    }).join(',');
-
-    const query = `
-      INSERT INTO documents (text, embedding, metadata, source, category, word_count)
-      VALUES ${values}
-    `;
-
-    const params = chunk.flatMap(doc => [
-      doc.text,
-      pgvector.toSql(doc.embedding),
-      JSON.stringify(doc.metadata),
-      doc.metadata.source,
-      doc.metadata.category,
-      doc.metadata.word_count
-    ]);
-
-    await this.pool.query(query, params);
-  }
-
-  // Update tsvector after bulk insert
-  await this.pool.query(`
-    UPDATE documents
-    SET tsvector_content = to_tsvector('english', text)
-    WHERE tsvector_content IS NULL
-  `);
-}
-```
-
-### 1.6 Key Metrics to Capture
-
-**Performance Metrics**:
-- Query latency (P50, P90, P99) at 99% recall for 1M, 10M, 50M vectors
-- Throughput (QPS) with 1, 10, 100 concurrent clients
-- Index build time for HNSW vs IVFFlat
-- Hybrid search latency vs pure vector search
-- Filter overhead at different selectivity levels
-
-**Resource Metrics**:
-- Memory consumption (shared_buffers + work_mem)
-- Disk I/O (reads/writes per query)
-- CPU utilization during queries and indexing
-- Index size on disk (HNSW vs IVFFlat vs halfvec)
-
-**Operational Metrics**:
-- Setup time (including configuration tuning)
-- Query API complexity (SQL vs specialized syntax)
-- Monitoring integration effort
-- Backup/restore performance with vector data
-
----
-
-## Phase 2: ChromaDB Implementation
-
-**Goal**: Evaluate embedded database for rapid prototyping and small-scale deployments.
-
-### 2.1 Infrastructure Setup
-
-**Docker Compose Configuration**:
-```yaml
-services:
+  # ChromaDB
   chromadb:
     image: chromadb/chroma:latest
+    container_name: benchmark_chromadb
     ports:
       - "8000:8000"
     volumes:
@@ -494,149 +580,36 @@ services:
     environment:
       ALLOW_RESET: "true"
       ANONYMIZED_TELEMETRY: "false"
-```
 
-**Client Configuration**:
-```typescript
-import { ChromaClient } from 'chromadb';
+  # Qdrant
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    container_name: benchmark_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
 
-const client = new ChromaClient({
-  path: 'http://localhost:8000'
-});
-```
-
-### 2.2 Collection Design
-
-**Collection Schema**:
-```typescript
-// src/databases/chromadb/chromadb.service.ts
-@Injectable()
-export class ChromaDbService implements OnModuleInit {
-  private client: ChromaClient;
-  private collection: Collection;
-
-  async onModuleInit() {
-    this.client = new ChromaClient({ path: process.env.CHROMA_URL });
-
-    this.collection = await this.client.createCollection({
-      name: 'documents',
-      metadata: {
-        'hnsw:space': 'cosine',
-        'hnsw:construction_ef': 100,
-        'hnsw:search_ef': 100,
-        'hnsw:M': 16
-      }
-    });
-  }
-
-  async addDocuments(
-    ids: string[],
-    embeddings: number[][],
-    metadatas: Record<string, any>[],
-    documents: string[]
-  ) {
-    await this.collection.add({
-      ids,
-      embeddings,
-      metadatas,
-      documents
-    });
-  }
-
-  async vectorSearch(queryEmbedding: number[], nResults: number = 10) {
-    return await this.collection.query({
-      queryEmbeddings: [queryEmbedding],
-      nResults
-    });
-  }
-
-  async filteredSearch(
-    queryEmbedding: number[],
-    where: Record<string, any>,
-    nResults: number = 10
-  ) {
-    return await this.collection.query({
-      queryEmbeddings: [queryEmbedding],
-      nResults,
-      where
-    });
-  }
-}
-```
-
-### 2.3 Benchmark Test Suite
-
-**Key Tests**:
-1. **Baseline Performance**: 100K, 1M, 10M vectors (identify breaking point)
-2. **Metadata Filtering**: Test MongoDB-like query operators
-3. **Concurrent Load**: Measure QPS degradation under load
-4. **Memory Consumption**: Track RAM usage as dataset grows
-
-**Critical Test - Scalability Limit**:
-```typescript
-async findScalabilityLimit() {
-  const vectorCounts = [100_000, 500_000, 1_000_000, 5_000_000, 10_000_000];
-
-  for (const count of vectorCounts) {
-    try {
-      await this.loadVectors(count);
-      const result = await this.runLatencyTest(100); // 100 queries
-
-      console.log(`${count} vectors: ${result.latencyP99}ms P99, ${result.qps} QPS`);
-
-      if (result.qps < 50 || result.latencyP99 > 500) {
-        console.log(`⚠️ Performance degradation at ${count} vectors`);
-      }
-    } catch (error) {
-      console.log(`❌ Crashed at ${count} vectors: ${error.message}`);
-      break;
-    }
-  }
-}
-```
-
-### 2.4 Key Metrics to Capture
-
-**Performance Metrics**:
-- Query latency at 100K, 1M, 10M vectors
-- QPS degradation curve as dataset grows
-- Crash threshold (if any)
-- Filter query overhead
-
-**Operational Metrics**:
-- Setup simplicity (time to first query)
-- API ergonomics vs competitors
-- Documentation quality for Node.js
-- Production readiness assessment
-
----
-
-## Phase 3: Milvus Implementation
-
-**Goal**: Test cloud-native architecture for enterprise scale (100M+ vectors) and hybrid search dominance.
-
-### 3.1 Infrastructure Setup
-
-**Docker Compose Configuration** (Standalone Mode):
-```yaml
-version: '3.8'
-
-services:
+  # Milvus dependencies
   etcd:
     image: quay.io/coreos/etcd:v3.5.5
+    container_name: benchmark_etcd
     environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
-      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: 1000
+      ETCD_QUOTA_BACKEND_BYTES: 4294967296
     volumes:
       - etcd_data:/etcd
 
   minio:
     image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: benchmark_minio
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
+      - "9000:9000"
       - "9001:9001"
     command: minio server /minio_data --console-address ":9001"
     volumes:
@@ -644,6 +617,7 @@ services:
 
   milvus:
     image: milvusdb/milvus:v2.5.0
+    container_name: benchmark_milvus
     command: ["milvus", "run", "standalone"]
     environment:
       ETCD_ENDPOINTS: etcd:2379
@@ -657,1045 +631,1467 @@ services:
     volumes:
       - milvus_data:/var/lib/milvus
 
-  attu:
-    image: zilliz/attu:latest
-    environment:
-      MILVUS_URL: milvus:19530
-    ports:
-      - "3000:3000"
-    depends_on:
-      - milvus
-
 volumes:
+  pgvector_data:
+  chromadb_data:
+  qdrant_data:
   etcd_data:
   minio_data:
   milvus_data:
 ```
 
-### 3.2 Collection & Index Design
+---
 
-**Collection Schema with Hybrid Search**:
+## Phase 2: PGVector Implementation
+
+**Goal**: Establish baseline with PostgreSQL + pgvector extension.
+
+### 2.1 Dependencies
+
+Add to `package.json`:
+```json
+{
+  "dependencies": {
+    "pg": "^8.11.0",
+    "pgvector": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.10.0"
+  }
+}
+```
+
+### 2.2 Module Structure
+
 ```typescript
-// src/databases/milvus/milvus.service.ts
-import { MilvusClient, DataType, IndexType, MetricType } from '@zilliz/milvus2-sdk-node';
+// src/modules/vector-benchmarks/databases/pgvector/pgvector.module.ts
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { PgVectorService } from './pgvector.service';
+
+@Module({
+  imports: [ConfigModule],
+  providers: [PgVectorService],
+  exports: [PgVectorService],
+})
+export class PgVectorModule {}
+```
+
+### 2.3 Service Implementation
+
+```typescript
+// src/modules/vector-benchmarks/databases/pgvector/pgvector.service.ts
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Pool, PoolClient } from 'pg';
+import pgvector from 'pgvector/pg';
+import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
 
 @Injectable()
-export class MilvusService implements OnModuleInit {
-  private client: MilvusClient;
-  private collectionName = 'documents';
+export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnModuleDestroy {
+  private pool: Pool;
+  private currentCollection: string;
+
+  constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    this.client = new MilvusClient({ address: 'localhost:19530' });
+    this.pool = new Pool({
+      host: this.configService.get('PGVECTOR_HOST', 'localhost'),
+      port: this.configService.get('PGVECTOR_PORT', 5433),
+      database: this.configService.get('PGVECTOR_DATABASE', 'benchmark_db'),
+      user: this.configService.get('PGVECTOR_USER', 'benchmark_user'),
+      password: this.configService.get('PGVECTOR_PASSWORD', 'benchmark_pass'),
+      max: 20,
+    });
+
+    await pgvector.registerType(this.pool);
+    console.log('PGVector connection established');
+  }
+
+  async onModuleDestroy() {
+    await this.pool.end();
+  }
+
+  async initialize(): Promise<void> {
+    await this.pool.query('CREATE EXTENSION IF NOT EXISTS vector');
+  }
+
+  async createCollection(name: string, dimensions: number): Promise<void> {
+    this.currentCollection = name;
+
+    // Drop table if exists
+    await this.pool.query(`DROP TABLE IF EXISTS ${name}`);
+
+    // Create table
+    await this.pool.query(`
+      CREATE TABLE ${name} (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        embedding vector(${dimensions}),
+        metadata JSONB,
+        source TEXT,
+        category TEXT,
+        created_at TIMESTAMP,
+        word_count INTEGER
+      )
+    `);
+
+    // Create indexes
+    await this.pool.query(`CREATE INDEX ON ${name} USING GIN (metadata)`);
+    await this.pool.query(`CREATE INDEX ON ${name}(source)`);
+    await this.pool.query(`CREATE INDEX ON ${name}(category)`);
+  }
+
+  async createVectorIndex(indexType: 'hnsw' | 'ivfflat' = 'hnsw'): Promise<void> {
+    const tableName = this.currentCollection;
+
+    if (indexType === 'hnsw') {
+      await this.pool.query(`
+        CREATE INDEX ON ${tableName}
+        USING hnsw (embedding vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64)
+      `);
+    } else {
+      await this.pool.query(`
+        CREATE INDEX ON ${tableName}
+        USING ivfflat (embedding vector_cosine_ops)
+        WITH (lists = 100)
+      `);
+    }
+  }
+
+  async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Batch insert
+      const batchSize = 1000;
+      for (let i = 0; i < documents.length; i += batchSize) {
+        const batch = documents.slice(i, i + batchSize);
+        const values = batch.map((doc, idx) => {
+          const base = idx * 8;
+          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`;
+        }).join(',');
+
+        const params = batch.flatMap(doc => [
+          doc.id,
+          doc.text,
+          pgvector.toSql(doc.embedding),
+          JSON.stringify(doc.metadata),
+          doc.metadata.source,
+          doc.metadata.category,
+          doc.metadata.created_at,
+          doc.metadata.word_count,
+        ]);
+
+        await client.query(
+          `INSERT INTO ${this.currentCollection}
+           (id, text, embedding, metadata, source, category, created_at, word_count)
+           VALUES ${values}`,
+          params
+        );
+
+        if ((i + batchSize) % 10000 === 0) {
+          console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+        }
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
+    const client = await this.pool.connect();
+    try {
+      // Set ef_search dynamically based on limit
+      const efSearch = Math.max(limit * 2, 100);
+      await client.query(`SET hnsw.ef_search = ${efSearch}`);
+
+      const result = await client.query(
+        `SELECT id, text, metadata, embedding <=> $1 AS distance
+         FROM ${this.currentCollection}
+         ORDER BY embedding <=> $1
+         LIMIT $2`,
+        [pgvector.toSql(query), limit]
+      );
+
+      return result.rows.map(row => ({
+        id: row.id,
+        score: 1 - row.distance, // Convert distance to similarity score
+        document: {
+          id: row.id,
+          text: row.text,
+          embedding: [], // Don't return embedding to save memory
+          metadata: row.metadata,
+        },
+      }));
+    } finally {
+      client.release();
+    }
+  }
+
+  async filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]> {
+    const client = await this.pool.connect();
+    try {
+      const efSearch = Math.max(limit * 2, 100);
+      await client.query(`SET hnsw.ef_search = ${efSearch}`);
+
+      // Build WHERE clause from filter
+      const whereClauses: string[] = [];
+      const params: any[] = [pgvector.toSql(query)];
+      let paramIndex = 2;
+
+      if (filter.source) {
+        whereClauses.push(`source = $${paramIndex}`);
+        params.push(filter.source);
+        paramIndex++;
+      }
+
+      if (filter.category) {
+        whereClauses.push(`category = $${paramIndex}`);
+        params.push(filter.category);
+        paramIndex++;
+      }
+
+      if (filter.word_count_min) {
+        whereClauses.push(`word_count >= $${paramIndex}`);
+        params.push(filter.word_count_min);
+        paramIndex++;
+      }
+
+      if (filter.word_count_max) {
+        whereClauses.push(`word_count <= $${paramIndex}`);
+        params.push(filter.word_count_max);
+        paramIndex++;
+      }
+
+      const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+      params.push(limit);
+
+      const result = await client.query(
+        `SELECT id, text, metadata, embedding <=> $1 AS distance
+         FROM ${this.currentCollection}
+         ${whereClause}
+         ORDER BY embedding <=> $1
+         LIMIT $${paramIndex}`,
+        params
+      );
+
+      return result.rows.map(row => ({
+        id: row.id,
+        score: 1 - row.distance,
+        document: {
+          id: row.id,
+          text: row.text,
+          embedding: [],
+          metadata: row.metadata,
+        },
+      }));
+    } finally {
+      client.release();
+    }
+  }
+
+  async hybridSearch(queryVector: number[], queryText: string, limit: number, alpha: number = 0.5): Promise<SearchResult[]> {
+    // Simplified hybrid search using RRF
+    // In production, you'd add full-text search with tsvector
+    const vectorResults = await this.vectorSearch(queryVector, 50);
+
+    // For now, just return vector results
+    // Full text search would be added here
+    return vectorResults.slice(0, limit);
+  }
+
+  async deleteCollection(name: string): Promise<void> {
+    await this.pool.query(`DROP TABLE IF EXISTS ${name}`);
+  }
+
+  async getStats(): Promise<DatabaseStats> {
+    const result = await this.pool.query(`
+      SELECT
+        COUNT(*) as vector_count,
+        pg_total_relation_size($1) as index_size
+      FROM ${this.currentCollection}
+    `, [this.currentCollection]);
+
+    return {
+      vectorCount: parseInt(result.rows[0].vector_count),
+      indexSize: parseInt(result.rows[0].index_size),
+      memoryUsage: 0, // Would need to query pg_stat_activity
+    };
+  }
+}
+```
+
+### 2.4 Benchmark Tests
+
+```typescript
+// src/modules/vector-benchmarks/benchmarks/latency.benchmark.ts
+import { Injectable } from '@nestjs/common';
+import { BaseBenchmark } from './base.benchmark';
+import { VectorDatabaseService, BenchmarkResult } from '../interfaces/benchmark-result.interface';
+
+@Injectable()
+export class LatencyBenchmark extends BaseBenchmark {
+  async runBenchmark(
+    service: VectorDatabaseService,
+    queryVectors: number[][],
+    config: any
+  ): Promise<BenchmarkResult> {
+    const latencies: number[] = [];
+    const startTime = Date.now();
+
+    for (const queryVector of queryVectors) {
+      const { latency } = await this.measureLatency(() =>
+        service.vectorSearch(queryVector, config.topK)
+      );
+      latencies.push(latency);
+    }
+
+    const totalTime = (Date.now() - startTime) / 1000; // seconds
+    const systemStats = this.getSystemStats();
+
+    return {
+      database: config.database,
+      testName: 'Latency Test',
+      timestamp: new Date(),
+      config,
+      metrics: {
+        latencyP50: this.calculatePercentile(latencies, 0.5),
+        latencyP90: this.calculatePercentile(latencies, 0.9),
+        latencyP99: this.calculatePercentile(latencies, 0.99),
+        latencyMean: this.calculateMean(latencies),
+        qps: queryVectors.length / totalTime,
+        recall: config.recallTarget,
+        memoryUsedMB: systemStats.memoryUsage,
+        cpuUtilization: systemStats.cpuUsage,
+        errors: 0,
+        totalQueries: queryVectors.length,
+      },
+    };
+  }
+}
+```
+
+---
+
+## Phase 3: ChromaDB Implementation
+
+**Goal**: Evaluate embedded database for rapid prototyping.
+
+### 3.1 Dependencies
+
+```json
+{
+  "dependencies": {
+    "chromadb": "^1.9.0"
+  }
+}
+```
+
+### 3.2 Service Implementation
+
+```typescript
+// src/modules/vector-benchmarks/databases/chromadb/chromadb.service.ts
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ChromaClient, Collection } from 'chromadb';
+import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
+
+@Injectable()
+export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
+  private client: ChromaClient;
+  private collection: Collection;
+
+  constructor(private configService: ConfigService) {}
+
+  async onModuleInit() {
+    const url = this.configService.get('CHROMADB_URL', 'http://localhost:8000');
+    this.client = new ChromaClient({ path: url });
+    console.log('ChromaDB connection established');
+  }
+
+  async initialize(): Promise<void> {
+    // ChromaDB doesn't require initialization
+  }
+
+  async createCollection(name: string, dimensions: number): Promise<void> {
+    try {
+      await this.client.deleteCollection({ name });
+    } catch (error) {
+      // Collection doesn't exist, that's fine
+    }
+
+    this.collection = await this.client.createCollection({
+      name,
+      metadata: {
+        'hnsw:space': 'cosine',
+        'hnsw:construction_ef': 100,
+        'hnsw:search_ef': 100,
+        'hnsw:M': 16,
+      },
+    });
+  }
+
+  async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
+    const batchSize = 1000;
+
+    for (let i = 0; i < documents.length; i += batchSize) {
+      const batch = documents.slice(i, i + batchSize);
+
+      await this.collection.add({
+        ids: batch.map(doc => doc.id),
+        embeddings: batch.map(doc => doc.embedding),
+        metadatas: batch.map(doc => doc.metadata as any),
+        documents: batch.map(doc => doc.text),
+      });
+
+      if ((i + batchSize) % 10000 === 0) {
+        console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+      }
+    }
+  }
+
+  async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
+    const result = await this.collection.query({
+      queryEmbeddings: [query],
+      nResults: limit,
+    });
+
+    return result.ids[0].map((id, idx) => ({
+      id: id as string,
+      score: 1 - (result.distances?.[0]?.[idx] || 0),
+      document: {
+        id: id as string,
+        text: result.documents?.[0]?.[idx] as string || '',
+        embedding: [],
+        metadata: result.metadatas?.[0]?.[idx] as any,
+      },
+    }));
+  }
+
+  async filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]> {
+    const result = await this.collection.query({
+      queryEmbeddings: [query],
+      nResults: limit,
+      where: filter,
+    });
+
+    return result.ids[0].map((id, idx) => ({
+      id: id as string,
+      score: 1 - (result.distances?.[0]?.[idx] || 0),
+      document: {
+        id: id as string,
+        text: result.documents?.[0]?.[idx] as string || '',
+        embedding: [],
+        metadata: result.metadatas?.[0]?.[idx] as any,
+      },
+    }));
+  }
+
+  async hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]> {
+    // ChromaDB doesn't have built-in hybrid search
+    // Fall back to vector search
+    return this.vectorSearch(queryVector, limit);
+  }
+
+  async deleteCollection(name: string): Promise<void> {
+    await this.client.deleteCollection({ name });
+  }
+
+  async getStats(): Promise<DatabaseStats> {
+    const count = await this.collection.count();
+    return {
+      vectorCount: count,
+      indexSize: 0, // Not exposed by ChromaDB
+      memoryUsage: 0, // Not exposed by ChromaDB
+    };
+  }
+}
+```
+
+---
+
+## Phase 4: Milvus Implementation
+
+**Goal**: Test cloud-native architecture for enterprise scale.
+
+### 4.1 Dependencies
+
+```json
+{
+  "dependencies": {
+    "@zilliz/milvus2-sdk-node": "^2.5.0"
+  }
+}
+```
+
+### 4.2 Service Implementation
+
+```typescript
+// src/modules/vector-benchmarks/databases/milvus/milvus.service.ts
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { MilvusClient, DataType, IndexType, MetricType } from '@zilliz/milvus2-sdk-node';
+import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
+
+@Injectable()
+export class MilvusService implements VectorDatabaseService, OnModuleInit {
+  private client: MilvusClient;
+  private currentCollection: string;
+  private dimensions: number;
+
+  constructor(private configService: ConfigService) {}
+
+  async onModuleInit() {
+    const host = this.configService.get('MILVUS_HOST', 'localhost');
+    const port = this.configService.get('MILVUS_PORT', '19530');
+
+    this.client = new MilvusClient({ address: `${host}:${port}` });
 
     // CRITICAL: Wait for connection
     await this.client.connectPromise.catch(err => {
       throw new Error(`Milvus connection failed: ${err.message}`);
     });
 
-    await this.createCollection();
+    console.log('Milvus connection established');
   }
 
-  async createCollection() {
+  async initialize(): Promise<void> {
+    // Milvus doesn't require initialization
+  }
+
+  async createCollection(name: string, dimensions: number): Promise<void> {
+    this.currentCollection = name;
+    this.dimensions = dimensions;
+
+    // Drop collection if exists
+    try {
+      await this.client.dropCollection({ collection_name: name });
+    } catch (error) {
+      // Collection doesn't exist
+    }
+
+    // Create collection schema
     const schema = [
       {
         name: 'id',
         description: 'Document ID',
-        data_type: DataType.Int64,
+        data_type: DataType.VarChar,
         is_primary_key: true,
-        autoID: true
+        max_length: 255,
       },
       {
         name: 'text',
-        description: 'Document text for BM25',
+        description: 'Document text',
         data_type: DataType.VarChar,
         max_length: 65535,
-        enable_analyzer: true, // Enable BM25
-        enable_match: true
       },
       {
-        name: 'dense_vector',
-        description: 'Dense embedding',
+        name: 'embedding',
+        description: 'Vector embedding',
         data_type: DataType.FloatVector,
-        dim: 1536
-      },
-      {
-        name: 'sparse_vector',
-        description: 'Sparse BM25 vector',
-        data_type: DataType.SparseFloatVector
+        dim: dimensions,
       },
       {
         name: 'source',
         data_type: DataType.VarChar,
-        max_length: 255
+        max_length: 255,
       },
       {
         name: 'category',
         data_type: DataType.VarChar,
-        max_length: 100
-      },
-      {
-        name: 'created_at',
-        data_type: DataType.Int64
+        max_length: 100,
       },
       {
         name: 'word_count',
-        data_type: DataType.Int32
-      }
+        data_type: DataType.Int32,
+      },
     ];
 
     await this.client.createCollection({
-      collection_name: this.collectionName,
+      collection_name: name,
       schema,
-      enable_dynamic_field: true
+      enable_dynamic_field: true,
     });
+  }
 
-    // Create HNSW index for dense vectors
+  async createVectorIndex(): Promise<void> {
     await this.client.createIndex({
-      collection_name: this.collectionName,
-      field_name: 'dense_vector',
+      collection_name: this.currentCollection,
+      field_name: 'embedding',
       index_type: IndexType.HNSW,
       metric_type: MetricType.COSINE,
       params: {
         M: 16,
-        efConstruction: 200
-      }
-    });
-
-    // Create index for sparse vectors (BM25)
-    await this.client.createIndex({
-      collection_name: this.collectionName,
-      field_name: 'sparse_vector',
-      index_type: IndexType.SPARSE_INVERTED_INDEX,
-      metric_type: MetricType.IP
+        efConstruction: 200,
+      },
     });
 
     await this.client.loadCollection({
-      collection_name: this.collectionName
+      collection_name: this.currentCollection,
     });
   }
 
-  async hybridSearch(
-    queryText: string,
-    queryVector: number[],
-    limit: number = 10,
-    alpha: number = 0.5
-  ) {
-    // Milvus 2.5 auto-generates sparse vector from text
+  async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
+    const batchSize = 1000;
+
+    for (let i = 0; i < documents.length; i += batchSize) {
+      const batch = documents.slice(i, i + batchSize);
+
+      const data = batch.map(doc => ({
+        id: doc.id,
+        text: doc.text,
+        embedding: doc.embedding,
+        source: doc.metadata.source,
+        category: doc.metadata.category,
+        word_count: doc.metadata.word_count,
+      }));
+
+      await this.client.insert({
+        collection_name: this.currentCollection,
+        data,
+      });
+
+      if ((i + batchSize) % 10000 === 0) {
+        console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+      }
+    }
+  }
+
+  async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
     const result = await this.client.search({
-      collection_name: this.collectionName,
-      data: [queryVector],
-      anns_field: 'dense_vector',
-      limit: 50,
-      params: { ef: 200 },
-      output_fields: ['id', 'text', 'source', 'category']
-    });
-
-    // BM25 search using built-in function
-    const bm25Result = await this.client.query({
-      collection_name: this.collectionName,
-      filter: `TEXT_MATCH(text, '${queryText}')`,
-      output_fields: ['id', 'text'],
-      limit: 50
-    });
-
-    // Server-side RRF fusion
-    return this.reciprocalRankFusion(
-      result[0],
-      bm25Result,
-      alpha,
-      limit
-    );
-  }
-
-  async vectorSearch(
-    queryVector: number[],
-    limit: number = 10,
-    filter?: string
-  ) {
-    return await this.client.search({
-      collection_name: this.collectionName,
-      data: [queryVector],
-      anns_field: 'dense_vector',
+      collection_name: this.currentCollection,
+      data: [query],
+      anns_field: 'embedding',
       limit,
       params: { ef: 200 },
-      filter, // e.g., "source == 'wikipedia'"
-      output_fields: ['id', 'text', 'source', 'category']
+      output_fields: ['id', 'text', 'source', 'category'],
     });
+
+    return result[0].map(item => ({
+      id: item.id as string,
+      score: item.score || 0,
+      document: {
+        id: item.id as string,
+        text: item.text || '',
+        embedding: [],
+        metadata: {
+          source: item.source || '',
+          category: item.category || '',
+          author: '',
+          created_at: new Date(),
+          word_count: 0,
+          tags: [],
+        },
+      },
+    }));
   }
 
-  private reciprocalRankFusion(
-    denseResults: any[],
-    sparseResults: any[],
-    alpha: number,
-    limit: number,
-    k: number = 60
-  ) {
-    const scores = new Map<string, number>();
+  async filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]> {
+    // Build filter expression
+    const filterExpressions: string[] = [];
 
-    denseResults.forEach((result, rank) => {
-      const score = alpha / (k + rank + 1);
-      scores.set(result.id, (scores.get(result.id) || 0) + score);
+    if (filter.source) {
+      filterExpressions.push(`source == "${filter.source}"`);
+    }
+    if (filter.category) {
+      filterExpressions.push(`category == "${filter.category}"`);
+    }
+    if (filter.word_count_min) {
+      filterExpressions.push(`word_count >= ${filter.word_count_min}`);
+    }
+    if (filter.word_count_max) {
+      filterExpressions.push(`word_count <= ${filter.word_count_max}`);
+    }
+
+    const filterExpression = filterExpressions.join(' && ');
+
+    const result = await this.client.search({
+      collection_name: this.currentCollection,
+      data: [query],
+      anns_field: 'embedding',
+      limit,
+      params: { ef: 200 },
+      filter: filterExpression || undefined,
+      output_fields: ['id', 'text', 'source', 'category'],
     });
 
-    sparseResults.forEach((result, rank) => {
-      const score = (1 - alpha) / (k + rank + 1);
-      scores.set(result.id, (scores.get(result.id) || 0) + score);
+    return result[0].map(item => ({
+      id: item.id as string,
+      score: item.score || 0,
+      document: {
+        id: item.id as string,
+        text: item.text || '',
+        embedding: [],
+        metadata: {
+          source: item.source || '',
+          category: item.category || '',
+          author: '',
+          created_at: new Date(),
+          word_count: 0,
+          tags: [],
+        },
+      },
+    }));
+  }
+
+  async hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]> {
+    // Simplified version - Milvus 2.5 supports BM25 but requires additional setup
+    return this.vectorSearch(queryVector, limit);
+  }
+
+  async deleteCollection(name: string): Promise<void> {
+    await this.client.dropCollection({ collection_name: name });
+  }
+
+  async getStats(): Promise<DatabaseStats> {
+    const stats = await this.client.getCollectionStatistics({
+      collection_name: this.currentCollection,
     });
 
-    return Array.from(scores.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit);
+    return {
+      vectorCount: parseInt(stats.data.row_count || '0'),
+      indexSize: 0,
+      memoryUsage: 0,
+    };
   }
 }
 ```
-
-### 3.3 Benchmark Test Suite
-
-**Key Tests**:
-1. **Hybrid Search Performance**: Measure 30x speedup claim vs Elasticsearch
-2. **Scale Testing**: 10M, 50M, 100M vectors (if resources allow)
-3. **Component Scaling**: Test Query Node replication (1→8 replicas)
-4. **GPU Acceleration**: CAGRA index build time (if GPU available)
-
-**Hybrid Search Benchmark**:
-```typescript
-async benchmarkHybridSearch() {
-  const queries = this.loadTestQueries(1000);
-  const latencies: number[] = [];
-
-  for (const query of queries) {
-    const start = performance.now();
-    await this.milvusService.hybridSearch(
-      query.text,
-      query.vector,
-      10,
-      0.5
-    );
-    const end = performance.now();
-    latencies.push(end - start);
-  }
-
-  console.log(`Milvus Hybrid Search - P50: ${this.percentile(latencies, 0.5)}ms`);
-  console.log(`Milvus Hybrid Search - P99: ${this.percentile(latencies, 0.99)}ms`);
-  console.log(`Milvus Hybrid Search - Avg: ${latencies.reduce((a, b) => a + b) / latencies.length}ms`);
-
-  // Compare against baseline (vector-only search)
-  const vectorOnlyLatencies = await this.benchmarkVectorOnlySearch(queries);
-  const overhead = ((latencies.reduce((a, b) => a + b) / latencies.length) /
-                   (vectorOnlyLatencies.reduce((a, b) => a + b) / vectorOnlyLatencies.length) - 1) * 100;
-
-  console.log(`Hybrid search overhead: ${overhead.toFixed(2)}%`);
-}
-```
-
-### 3.4 Key Metrics to Capture
-
-**Performance Metrics**:
-- Hybrid search latency (validate 6ms claim at 1M vectors)
-- Vector-only search latency at 10M, 50M, 100M vectors
-- Throughput with Query Node scaling (1, 2, 4, 8 replicas)
-- Index build time (CPU vs GPU if available)
-- BM25 server-side processing overhead
-
-**Operational Metrics**:
-- Setup complexity (etcd + MinIO orchestration)
-- Attu UI usability for monitoring
-- Resource consumption per component
-- Node.js SDK quality vs Python
 
 ---
 
-## Phase 4: Qdrant Implementation
+## Phase 5: Qdrant Implementation
 
-**Goal**: Validate sub-10ms P99 latency and Filterable HNSW with <10% overhead at 99% filtering.
+**Goal**: Validate sub-10ms P99 latency and Filterable HNSW.
 
-### 4.1 Infrastructure Setup
+### 5.1 Dependencies
 
-**Docker Compose Configuration**:
-```yaml
-services:
-  qdrant:
-    image: qdrant/qdrant:v1.12.0
-    ports:
-      - "6333:6333"  # REST API
-      - "6334:6334"  # gRPC
-    volumes:
-      - qdrant_storage:/qdrant/storage
-    environment:
-      QDRANT__SERVICE__HTTP_PORT: 6333
-      QDRANT__SERVICE__GRPC_PORT: 6334
+```json
+{
+  "dependencies": {
+    "@qdrant/js-client-rest": "^1.12.0"
+  }
+}
 ```
 
-**Client Configuration**:
+### 5.2 Service Implementation
+
 ```typescript
+// src/modules/vector-benchmarks/databases/qdrant/qdrant.service.ts
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
 
-const client = new QdrantClient({
-  url: 'http://localhost:6333',
-  apiKey: process.env.QDRANT_API_KEY // Optional for auth
-});
-```
-
-### 4.2 Collection & Index Design
-
-**Collection with Filterable HNSW**:
-```typescript
-// src/databases/qdrant/qdrant.service.ts
 @Injectable()
-export class QdrantService implements OnModuleInit {
+export class QdrantService implements VectorDatabaseService, OnModuleInit {
   private client: QdrantClient;
-  private collectionName = 'documents';
+  private currentCollection: string;
+
+  constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
+    const url = this.configService.get('QDRANT_URL', 'http://localhost:6333');
+    const apiKey = this.configService.get('QDRANT_API_KEY');
+
     this.client = new QdrantClient({
-      url: process.env.QDRANT_URL || 'http://localhost:6333'
+      url,
+      apiKey,
     });
 
-    await this.createCollection();
+    console.log('Qdrant connection established');
   }
 
-  async createCollection() {
-    await this.client.createCollection(this.collectionName, {
+  async initialize(): Promise<void> {
+    // Qdrant doesn't require initialization
+  }
+
+  async createCollection(name: string, dimensions: number): Promise<void> {
+    this.currentCollection = name;
+
+    // Delete collection if exists
+    try {
+      await this.client.deleteCollection(name);
+    } catch (error) {
+      // Collection doesn't exist
+    }
+
+    // Create collection
+    await this.client.createCollection(name, {
       vectors: {
-        size: 1536,
+        size: dimensions,
         distance: 'Cosine',
-        on_disk: false // In-memory for lowest latency
+        on_disk: false, // In-memory for best performance
       },
       optimizers_config: {
         indexing_threshold: 20000,
-        memmap_threshold: 50000
+        memmap_threshold: 50000,
       },
       hnsw_config: {
         m: 16,
         ef_construct: 100,
         full_scan_threshold: 10000,
-        on_disk: false
+        on_disk: false,
       },
-      quantization_config: {
-        binary: {
-          always_ram: true
-        }
-      }
     });
 
     // Create payload indexes for filterable HNSW
-    await this.client.createPayloadIndex(this.collectionName, {
+    await this.client.createPayloadIndex(name, {
       field_name: 'source',
-      field_schema: 'keyword'
+      field_schema: 'keyword',
     });
 
-    await this.client.createPayloadIndex(this.collectionName, {
+    await this.client.createPayloadIndex(name, {
       field_name: 'category',
-      field_schema: 'keyword'
+      field_schema: 'keyword',
     });
 
-    await this.client.createPayloadIndex(this.collectionName, {
+    await this.client.createPayloadIndex(name, {
       field_name: 'word_count',
-      field_schema: 'integer'
-    });
-
-    await this.client.createPayloadIndex(this.collectionName, {
-      field_name: 'created_at',
-      field_schema: 'datetime'
+      field_schema: 'integer',
     });
   }
 
-  async vectorSearch(queryVector: number[], limit: number = 10) {
-    return await this.client.search(this.collectionName, {
-      vector: queryVector,
+  async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
+    const batchSize = 1000;
+
+    for (let i = 0; i < documents.length; i += batchSize) {
+      const batch = documents.slice(i, i + batchSize);
+
+      const points = batch.map(doc => ({
+        id: doc.id,
+        vector: doc.embedding,
+        payload: {
+          text: doc.text,
+          source: doc.metadata.source,
+          category: doc.metadata.category,
+          author: doc.metadata.author,
+          created_at: doc.metadata.created_at.toISOString(),
+          word_count: doc.metadata.word_count,
+          tags: doc.metadata.tags,
+        },
+      }));
+
+      await this.client.upsert(this.currentCollection, {
+        wait: true,
+        points,
+      });
+
+      if ((i + batchSize) % 10000 === 0) {
+        console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+      }
+    }
+  }
+
+  async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
+    const result = await this.client.search(this.currentCollection, {
+      vector: query,
       limit,
       with_payload: true,
-      with_vector: false
+      with_vector: false,
     });
+
+    return result.map(point => ({
+      id: point.id as string,
+      score: point.score,
+      document: {
+        id: point.id as string,
+        text: (point.payload?.text as string) || '',
+        embedding: [],
+        metadata: {
+          source: (point.payload?.source as string) || '',
+          category: (point.payload?.category as string) || '',
+          author: (point.payload?.author as string) || '',
+          created_at: new Date(point.payload?.created_at as string),
+          word_count: (point.payload?.word_count as number) || 0,
+          tags: (point.payload?.tags as string[]) || [],
+        },
+      },
+    }));
   }
 
-  async filteredSearch(
-    queryVector: number[],
-    filter: any,
-    limit: number = 10
-  ) {
-    // Filterable HNSW: filter applied during graph traversal
-    return await this.client.search(this.collectionName, {
-      vector: queryVector,
-      filter,
+  async filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]> {
+    // Build Qdrant filter
+    const must: any[] = [];
+
+    if (filter.source) {
+      must.push({ key: 'source', match: { value: filter.source } });
+    }
+    if (filter.category) {
+      must.push({ key: 'category', match: { value: filter.category } });
+    }
+    if (filter.word_count_min) {
+      must.push({ key: 'word_count', range: { gte: filter.word_count_min } });
+    }
+    if (filter.word_count_max) {
+      must.push({ key: 'word_count', range: { lte: filter.word_count_max } });
+    }
+
+    const qdrantFilter = must.length > 0 ? { must } : undefined;
+
+    const result = await this.client.search(this.currentCollection, {
+      vector: query,
+      filter: qdrantFilter,
       limit,
-      with_payload: true
-    });
-  }
-
-  async hybridSearch(
-    queryVector: number[],
-    queryText: string,
-    limit: number = 10,
-    alpha: number = 0.5
-  ) {
-    // Dense + Sparse vector search with RRF
-    const denseResults = await this.client.search(this.collectionName, {
-      vector: queryVector,
-      limit: 50
+      with_payload: true,
+      with_vector: false,
     });
 
-    // BM25-style sparse search (requires sparse vectors indexed)
-    const sparseResults = await this.client.query(this.collectionName, {
-      using: 'sparse',
-      query: this.tokenize(queryText),
-      limit: 50
-    });
-
-    // Client-side RRF fusion
-    return this.reciprocalRankFusion(denseResults, sparseResults, alpha, limit);
+    return result.map(point => ({
+      id: point.id as string,
+      score: point.score,
+      document: {
+        id: point.id as string,
+        text: (point.payload?.text as string) || '',
+        embedding: [],
+        metadata: {
+          source: (point.payload?.source as string) || '',
+          category: (point.payload?.category as string) || '',
+          author: (point.payload?.author as string) || '',
+          created_at: new Date(point.payload?.created_at as string),
+          word_count: (point.payload?.word_count as number) || 0,
+          tags: (point.payload?.tags as string[]) || [],
+        },
+      },
+    }));
   }
 
-  async searchWithBinaryQuantization(
-    queryVector: number[],
-    limit: number = 10
-  ) {
-    // Test RaBitQ quantization performance
-    return await this.client.search(this.collectionName, {
-      vector: queryVector,
-      limit,
-      params: {
-        quantization: {
-          rescore: true, // Rescore with original vectors
-          oversampling: 2.0
-        }
-      }
-    });
+  async hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]> {
+    // Simplified - full hybrid search would require sparse vectors
+    return this.vectorSearch(queryVector, limit);
   }
 
-  private tokenize(text: string): Map<number, number> {
-    // Simple tokenization for sparse vectors
-    // Production: use proper BM25 tokenizer
-    const tokens = text.toLowerCase().split(/\W+/);
-    const tokenCounts = new Map<number, number>();
-
-    tokens.forEach(token => {
-      const hash = this.hashToken(token);
-      tokenCounts.set(hash, (tokenCounts.get(hash) || 0) + 1);
-    });
-
-    return tokenCounts;
+  async deleteCollection(name: string): Promise<void> {
+    await this.client.deleteCollection(name);
   }
 
-  private hashToken(token: string): number {
-    // Simple hash function
-    let hash = 0;
-    for (let i = 0; i < token.length; i++) {
-      hash = ((hash << 5) - hash) + token.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash);
+  async getStats(): Promise<DatabaseStats> {
+    const info = await this.client.getCollection(this.currentCollection);
+
+    return {
+      vectorCount: info.points_count || 0,
+      indexSize: 0,
+      memoryUsage: 0,
+    };
   }
 }
-```
-
-### 4.3 Benchmark Test Suite
-
-**Key Tests**:
-1. **Latency Championship**: Target sub-10ms P99 at various scales
-2. **Filterable HNSW**: Measure overhead at 1%, 10%, 50%, 99% filtering
-3. **Binary Quantization**: Test RaBitQ 40x speedup with 32x memory reduction
-4. **Throughput vs Latency**: Compare 41 QPS at 99% recall against PGVector's 471 QPS
-
-**Filterable HNSW Benchmark**:
-```typescript
-async benchmarkFilterableHNSW() {
-  const filterSelectivities = [0.01, 0.10, 0.50, 0.90, 0.99];
-  const baselineLatencies = await this.runUnfilteredSearch(1000);
-
-  for (const selectivity of filterSelectivities) {
-    const filter = this.generateFilter(selectivity);
-    const filteredLatencies: number[] = [];
-
-    for (let i = 0; i < 1000; i++) {
-      const queryVector = this.generateRandomVector(1536);
-      const start = performance.now();
-      await this.qdrantService.filteredSearch(queryVector, filter, 10);
-      const end = performance.now();
-      filteredLatencies.push(end - start);
-    }
-
-    const baselineP99 = this.percentile(baselineLatencies, 0.99);
-    const filteredP99 = this.percentile(filteredLatencies, 0.99);
-    const overhead = ((filteredP99 / baselineP99) - 1) * 100;
-
-    console.log(`Filtering ${(selectivity * 100).toFixed(0)}% of data:`);
-    console.log(`  Baseline P99: ${baselineP99.toFixed(2)}ms`);
-    console.log(`  Filtered P99: ${filteredP99.toFixed(2)}ms`);
-    console.log(`  Overhead: ${overhead.toFixed(2)}%`);
-  }
-}
-
-private generateFilter(selectivity: number): any {
-  // Generate filter that matches selectivity% of documents
-  // Example: if selectivity = 0.1, match ~10% of documents
-  const totalCategories = 10;
-  const categoriesToInclude = Math.ceil(totalCategories * selectivity);
-
-  return {
-    should: [
-      {
-        key: 'category',
-        match: {
-          any: Array.from({ length: categoriesToInclude }, (_, i) => `category_${i}`)
-        }
-      }
-    ]
-  };
-}
-```
-
-**Binary Quantization Benchmark**:
-```typescript
-async benchmarkBinaryQuantization() {
-  // Test memory and speed improvements with RaBitQ
-
-  // 1. Measure memory usage before quantization
-  const memoryBefore = await this.getCollectionMemoryUsage();
-
-  // 2. Enable binary quantization
-  await this.qdrantService.client.updateCollection(this.collectionName, {
-    quantization_config: {
-      binary: {
-        always_ram: true
-      }
-    }
-  });
-
-  // Wait for quantization to complete
-  await this.waitForOptimization();
-
-  const memoryAfter = await this.getCollectionMemoryUsage();
-  const memoryReduction = memoryBefore / memoryAfter;
-
-  console.log(`Memory before: ${(memoryBefore / 1024 / 1024).toFixed(2)} MB`);
-  console.log(`Memory after: ${(memoryAfter / 1024 / 1024).toFixed(2)} MB`);
-  console.log(`Memory reduction: ${memoryReduction.toFixed(2)}x`);
-
-  // 3. Benchmark query speed
-  const queries = this.generateRandomVectors(1000, 1536);
-
-  const standardLatencies = await this.benchmarkStandardSearch(queries);
-  const quantizedLatencies = await this.benchmarkQuantizedSearch(queries);
-
-  const speedup = (standardLatencies.reduce((a, b) => a + b) / standardLatencies.length) /
-                  (quantizedLatencies.reduce((a, b) => a + b) / quantizedLatencies.length);
-
-  console.log(`Standard search avg: ${(standardLatencies.reduce((a, b) => a + b) / standardLatencies.length).toFixed(2)}ms`);
-  console.log(`Quantized search avg: ${(quantizedLatencies.reduce((a, b) => a + b) / quantizedLatencies.length).toFixed(2)}ms`);
-  console.log(`Speedup: ${speedup.toFixed(2)}x`);
-}
-```
-
-### 4.4 Key Metrics to Capture
-
-**Performance Metrics**:
-- P50/P99 latency at 1M, 10M, 50M vectors
-- Filterable HNSW overhead at various selectivities
-- Binary quantization memory reduction and speedup
-- Throughput (QPS) at 99% recall vs PGVector
-- Hybrid search with RRF latency
-
-**Operational Metrics**:
-- Setup simplicity (single Docker container)
-- TypeScript SDK quality and ergonomics
-- REST API vs gRPC performance comparison
-- Cluster mode setup complexity (if tested)
-
----
-
-## Phase 5: LanceDB Implementation
-
-**Goal**: Evaluate disk-based architecture for cost-efficient serverless deployments and >RAM datasets.
-
-### 5.1 Infrastructure Setup
-
-**Embedded Mode** (Local Development):
-```typescript
-import * as lancedb from '@lancedb/lancedb';
-
-const db = await lancedb.connect('./data/lancedb');
-```
-
-**S3-Backed Mode** (Serverless):
-```typescript
-const db = await lancedb.connect('s3://my-bucket/lancedb', {
-  storageOptions: {
-    region: 'us-east-1',
-    awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-  }
-});
-```
-
-### 5.2 Table Schema & Indexing
-
-**Table Creation**:
-```typescript
-// src/databases/lancedb/lancedb.service.ts
-@Injectable()
-export class LanceDbService implements OnModuleInit {
-  private db: lancedb.Connection;
-  private tableName = 'documents';
-
-  async onModuleInit() {
-    this.db = await lancedb.connect(process.env.LANCEDB_URI || './data/lancedb');
-  }
-
-  async createTable(schema: any[]) {
-    const table = await this.db.createTable(this.tableName, schema);
-
-    // Create IVF-PQ index for vector search
-    await table.createIndex('embedding', {
-      type: 'IVF_PQ',
-      num_partitions: 256,
-      num_sub_vectors: 96,
-      metric: 'cosine'
-    });
-
-    return table;
-  }
-
-  async vectorSearch(queryVector: number[], limit: number = 10) {
-    const table = await this.db.openTable(this.tableName);
-
-    return await table
-      .vectorSearch(queryVector)
-      .limit(limit)
-      .toArray();
-  }
-
-  async filteredSearch(
-    queryVector: number[],
-    filter: string,
-    limit: number = 10
-  ) {
-    const table = await this.db.openTable(this.tableName);
-
-    return await table
-      .vectorSearch(queryVector)
-      .where(filter) // SQL-like syntax
-      .limit(limit)
-      .toArray();
-  }
-
-  async hybridSearch(
-    queryVector: number[],
-    queryText: string,
-    limit: number = 10
-  ) {
-    const table = await this.db.openTable(this.tableName);
-
-    // Native FTS + vector search
-    const results = await table
-      .vectorSearch(queryVector)
-      .limit(50)
-      .select(['id', 'text', 'metadata', '_distance'])
-      .toArray();
-
-    // Full-text search using Lance native FTS
-    const ftsResults = await table
-      .search(queryText)
-      .limit(50)
-      .select(['id', 'text', 'metadata', '_score'])
-      .toArray();
-
-    // Client-side RRF fusion
-    return this.reciprocalRankFusion(results, ftsResults, 0.5, limit);
-  }
-
-  async hybridSearchWithTantivy(
-    queryVector: number[],
-    queryText: string,
-    limit: number = 10
-  ) {
-    // Tantivy integration (local filesystem only)
-    const table = await this.db.openTable(this.tableName);
-
-    const results = await table
-      .search(queryText)
-      .limit(50)
-      .select(['id', 'text'])
-      .toArray();
-
-    // Rerank with vector similarity
-    const reranked = await table
-      .vectorSearch(queryVector)
-      .where(`id IN (${results.map(r => r.id).join(',')})`)
-      .limit(limit)
-      .toArray();
-
-    return reranked;
-  }
-
-  async addDocuments(documents: any[]) {
-    const table = await this.db.openTable(this.tableName);
-    await table.add(documents);
-  }
-}
-```
-
-### 5.3 Benchmark Test Suite
-
-**Key Tests**:
-1. **Disk Efficiency**: Compare performance vs FAISS when data > RAM
-2. **S3-Backed Serverless**: Lambda query latency without local data
-3. **Columnar Format**: Benchmark Lance vs Parquet random access
-4. **Cold Start**: Measure cache warmup time
-
-**Disk vs Memory Benchmark**:
-```typescript
-async benchmarkDiskEfficiency() {
-  // Test with dataset larger than available RAM
-  const vectorCount = 100_000_000; // 100M vectors @ 1536 dims = ~614GB
-  const availableRAM = os.totalmem();
-
-  console.log(`Dataset size: ~${(vectorCount * 1536 * 4 / 1024 / 1024 / 1024).toFixed(2)} GB`);
-  console.log(`Available RAM: ${(availableRAM / 1024 / 1024 / 1024).toFixed(2)} GB`);
-
-  // Load subset into LanceDB
-  await this.loadVectors(vectorCount);
-
-  // Benchmark query latency
-  const queries = this.generateRandomVectors(1000, 1536);
-  const latencies: number[] = [];
-
-  for (const query of queries) {
-    const start = performance.now();
-    await this.lanceDbService.vectorSearch(query, 10);
-    const end = performance.now();
-    latencies.push(end - start);
-  }
-
-  console.log(`Cold query P50: ${this.percentile(latencies, 0.5).toFixed(2)}ms`);
-  console.log(`Cold query P99: ${this.percentile(latencies, 0.99).toFixed(2)}ms`);
-
-  // Warm cache by running same queries
-  for (const query of queries.slice(0, 100)) {
-    await this.lanceDbService.vectorSearch(query, 10);
-  }
-
-  const warmLatencies: number[] = [];
-  for (const query of queries.slice(0, 100)) {
-    const start = performance.now();
-    await this.lanceDbService.vectorSearch(query, 10);
-    const end = performance.now();
-    warmLatencies.push(end - start);
-  }
-
-  console.log(`Warm query P50: ${this.percentile(warmLatencies, 0.5).toFixed(2)}ms`);
-  console.log(`Warm query P99: ${this.percentile(warmLatencies, 0.99).toFixed(2)}ms`);
-}
-```
-
-**Serverless Lambda Benchmark**:
-```typescript
-// Lambda function handler
-export async function handler(event: any) {
-  const db = await lancedb.connect('s3://my-bucket/lancedb');
-  const table = await db.openTable('documents');
-
-  const queryVector = JSON.parse(event.body).embedding;
-  const start = Date.now();
-
-  const results = await table
-    .vectorSearch(queryVector)
-    .limit(10)
-    .toArray();
-
-  const latency = Date.now() - start;
-
-  return {
-    statusCode: 200,
-    body: JSON.stringify({
-      results,
-      latency,
-      coldStart: event.requestContext.requestId // Track cold starts
-    })
-  };
-}
-```
-
-### 5.4 Key Metrics to Capture
-
-**Performance Metrics**:
-- Query latency with data in RAM vs on disk
-- Cold vs warm query performance
-- S3-backed serverless query latency (including network)
-- Throughput vs FAISS when data fits in RAM (178 vs 978 QPS claim)
-- Hybrid search latency with native FTS vs Tantivy
-
-**Cost Metrics**:
-- Storage cost (disk vs RAM pricing)
-- Lambda invocation cost vs EC2 instance cost
-- S3 GET request costs for queries
-
-**Operational Metrics**:
-- Setup complexity (embedded vs serverless)
-- Lance format advantages (versioning, columnar access)
-- Webpack configuration for Next.js/Vercel
-- Multimodal data support (images, audio)
-
----
-
-## Phase 6: Comparative Analysis & Reporting
-
-**Goal**: Synthesize all benchmark data into actionable decision framework.
-
-### 6.1 Unified Metrics Dashboard
-
-**Grafana Dashboard Panels**:
-1. **Query Latency Comparison**: P50/P99 across all databases at 1M, 10M, 50M vectors
-2. **Throughput Comparison**: QPS under load (1, 10, 100 concurrent clients)
-3. **Hybrid Search Performance**: Latency and accuracy (NDCG@10)
-4. **Memory Efficiency**: GB per 1M vectors (with/without quantization)
-5. **Index Build Time**: Time to index 1M vectors
-6. **Filtering Overhead**: Latency increase at different selectivities
-
-### 6.2 Decision Matrix
-
-**Use Case Mapping**:
-```typescript
-interface UseCaseProfile {
-  vectorCount: number;
-  latencySensitivity: 'low' | 'medium' | 'high';
-  throughputRequirement: number; // QPS
-  hybridSearchRequired: boolean;
-  existingInfrastructure?: 'postgres' | 'kubernetes' | 'serverless';
-  budgetConstraint: 'low' | 'medium' | 'high';
-  teamExpertise: 'general' | 'postgres' | 'rust' | 'distributed-systems';
-}
-
-function recommendDatabase(profile: UseCaseProfile): string {
-  // Decision tree based on benchmark results
-
-  if (profile.vectorCount < 1_000_000 && profile.latencySensitivity === 'low') {
-    return 'ChromaDB (prototyping only)';
-  }
-
-  if (profile.existingInfrastructure === 'postgres' && profile.vectorCount < 100_000_000) {
-    return 'PGVector (leverage existing ops expertise)';
-  }
-
-  if (profile.latencySensitivity === 'high' && profile.vectorCount < 10_000_000) {
-    return 'Qdrant (sub-10ms P99 latency)';
-  }
-
-  if (profile.vectorCount > 100_000_000 || profile.hybridSearchRequired) {
-    return 'Milvus (enterprise scale + 30x hybrid search advantage)';
-  }
-
-  if (profile.budgetConstraint === 'low' || profile.existingInfrastructure === 'serverless') {
-    return 'LanceDB (disk-based cost efficiency)';
-  }
-
-  return 'Qdrant (balanced choice for most scenarios)';
-}
-```
-
-### 6.3 Final Report Structure
-
-**Benchmark Report (`RESULTS.md`)**:
-1. **Executive Summary**: Key findings and recommendations
-2. **Methodology**: Hardware, software, test configurations
-3. **Performance Results**:
-   - Latency benchmarks (tables + charts)
-   - Throughput benchmarks
-   - Hybrid search comparison
-   - Memory efficiency
-   - Index build times
-4. **Operational Assessment**:
-   - Setup complexity scoring
-   - TypeScript integration quality
-   - Monitoring capabilities
-   - Production readiness
-5. **Cost Analysis**:
-   - TCO calculations (self-hosted vs managed)
-   - Resource consumption per 1M vectors
-6. **Decision Framework**:
-   - Use case matrix
-   - Migration considerations
-   - Scaling strategies
-7. **Appendix**:
-   - Raw benchmark data (CSV/JSON)
-   - Configuration files
-   - Code samples
-
-### 6.4 Reproducibility Package
-
-**Repository Structure**:
-```
-vector-db-comparison/
-├── README.md
-├── PLAN.md (this document)
-├── RESULTS.md (generated after benchmarks)
-├── docker-compose.yml (all databases)
-├── package.json
-├── tsconfig.json
-├── src/
-│   ├── databases/
-│   │   ├── pgvector/
-│   │   ├── chromadb/
-│   │   ├── milvus/
-│   │   ├── qdrant/
-│   │   └── lancedb/
-│   ├── benchmarks/
-│   │   ├── common/
-│   │   ├── latency.benchmark.ts
-│   │   ├── throughput.benchmark.ts
-│   │   ├── hybrid-search.benchmark.ts
-│   │   └── filtering.benchmark.ts
-│   ├── data/
-│   │   ├── generate-embeddings.ts
-│   │   └── load-dataset.ts
-│   └── utils/
-│       ├── metrics.ts
-│       └── reporting.ts
-├── monitoring/
-│   ├── prometheus.yml
-│   ├── grafana/
-│   │   └── dashboards/
-│   └── exporters/
-├── data/
-│   └── .gitkeep (actual data excluded from git)
-└── results/
-    ├── raw/
-    ├── charts/
-    └── RESULTS.md
 ```
 
 ---
 
-## Timeline & Resource Requirements
+## Phase 6: LanceDB Implementation
 
-### Estimated Timeline (Full Implementation)
+**Goal**: Evaluate disk-based architecture for cost-efficient serverless.
 
-- **Phase 1 (PGVector)**: 5-7 days
-  - Day 1-2: Infrastructure setup + schema design
-  - Day 3-4: NestJS integration + data ingestion
-  - Day 5-6: Benchmark suite implementation
-  - Day 7: Data collection + analysis
-
-- **Phase 2 (ChromaDB)**: 3-4 days
-  - Day 1: Setup + integration (simple architecture)
-  - Day 2-3: Benchmarks + scalability testing
-  - Day 4: Results analysis
-
-- **Phase 3 (Milvus)**: 7-9 days
-  - Day 1-2: Complex infrastructure (etcd, MinIO, Milvus)
-  - Day 3-4: Collection design + hybrid search implementation
-  - Day 5-7: Comprehensive benchmarks at scale
-  - Day 8-9: Analysis + distributed testing (if applicable)
-
-- **Phase 4 (Qdrant)**: 5-6 days
-  - Day 1: Setup + integration
-  - Day 2-3: Filterable HNSW + quantization testing
-  - Day 4-5: Latency-focused benchmarks
-  - Day 6: Analysis
-
-- **Phase 5 (LanceDB)**: 5-7 days
-  - Day 1-2: Embedded + serverless setup
-  - Day 3-4: Disk efficiency + S3 testing
-  - Day 5-6: Benchmarks
-  - Day 7: Cost analysis
-
-- **Phase 6 (Analysis & Reporting)**: 4-5 days
-  - Day 1-2: Data aggregation + visualization
-  - Day 3-4: Report writing
-  - Day 5: Review + publication
-
-**Total**: 29-38 days (approximately 6-8 weeks)
-
-### Resource Requirements
-
-**Hardware**:
-- 8-16 core CPU
-- 64-128GB RAM (128GB for 50M vector tests)
-- 500GB-1TB NVMe SSD
-- Optional: NVIDIA GPU for Milvus CAGRA testing
-
-**Software Licenses**:
-- All databases are open-source (Apache 2.0 / PostgreSQL License)
-- No licensing costs
-
-**Cloud Resources** (if not self-hosting):
-- AWS/GCP VM: c5.4xlarge equivalent ($0.68/hour × 300 hours = ~$204)
-- S3 storage for LanceDB testing: ~$50
-- Total estimated cloud cost: ~$300-500
-
-**Personnel**:
-- 1 engineer (full-time) or 2 engineers (part-time)
-- Expertise: TypeScript/NestJS, databases, benchmarking
-
----
-
-## Success Criteria
-
-1. **Reproducibility**: All benchmarks can be re-run with provided scripts
-2. **Completeness**: All 6 test types executed for each database
-3. **Statistical Validity**: 1000+ queries per test, P50/P90/P99 reported
-4. **Real-World Relevance**: Tests match production RAG patterns
-5. **Actionable Insights**: Decision framework validated with data
-6. **Open Source**: Full code and results published for community validation
-
----
-
-## Appendix A: Benchmark Claims to Validate
-
-From the research report, key claims to test:
-
-1. ✅ **PGVector**: 471 QPS at 99% recall (50M vectors, 768-dim)
-2. ✅ **Qdrant**: 38.71ms P99 latency, 48% better than PGVector
-3. ✅ **Milvus**: 30x faster hybrid search than Elasticsearch (6ms vs 200ms)
-4. ✅ **ChromaDB**: QPS drops to 112 at 10M vectors
-5. ✅ **LanceDB**: 178 QPS vs FAISS 978 QPS when data fits in RAM
-6. ✅ **Qdrant Binary Quantization**: 40x speedup, 32x memory reduction
-7. ✅ **Qdrant Filterable HNSW**: <10% overhead at 99% filtering
-8. ✅ **PGVector v0.8.1**: 150x faster index builds with parallelization
-
----
-
-## Appendix B: TypeScript Dependencies
+### 6.1 Dependencies
 
 ```json
 {
   "dependencies": {
-    "@nestjs/common": "^10.0.0",
-    "@nestjs/core": "^10.0.0",
-    "@nestjs/config": "^3.0.0",
+    "@lancedb/lancedb": "^0.15.0"
+  }
+}
+```
+
+### 6.2 Service Implementation
+
+```typescript
+// src/modules/vector-benchmarks/databases/lancedb/lancedb.service.ts
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import * as lancedb from '@lancedb/lancedb';
+import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
+
+@Injectable()
+export class LanceDbService implements VectorDatabaseService, OnModuleInit {
+  private db: lancedb.Connection;
+  private currentTable: string;
+
+  constructor(private configService: ConfigService) {}
+
+  async onModuleInit() {
+    const uri = this.configService.get('LANCEDB_URI', './data/lancedb');
+    this.db = await lancedb.connect(uri);
+    console.log('LanceDB connection established');
+  }
+
+  async initialize(): Promise<void> {
+    // LanceDB doesn't require initialization
+  }
+
+  async createCollection(name: string, dimensions: number): Promise<void> {
+    this.currentTable = name;
+
+    // Drop table if exists
+    try {
+      await this.db.dropTable(name);
+    } catch (error) {
+      // Table doesn't exist
+    }
+
+    // Create table with first document (LanceDB infers schema)
+    const dummyDoc = {
+      id: 'dummy',
+      text: 'dummy',
+      embedding: new Array(dimensions).fill(0),
+      source: '',
+      category: '',
+      word_count: 0,
+    };
+
+    const table = await this.db.createTable(name, [dummyDoc]);
+
+    // Delete dummy document
+    await table.delete('id = "dummy"');
+
+    // Create vector index
+    await table.createIndex('embedding', {
+      type: 'IVF_PQ',
+      num_partitions: 256,
+      num_sub_vectors: 96,
+      metric: 'cosine',
+    });
+  }
+
+  async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
+    const table = await this.db.openTable(this.currentTable);
+    const batchSize = 1000;
+
+    for (let i = 0; i < documents.length; i += batchSize) {
+      const batch = documents.slice(i, i + batchSize);
+
+      const data = batch.map(doc => ({
+        id: doc.id,
+        text: doc.text,
+        embedding: doc.embedding,
+        source: doc.metadata.source,
+        category: doc.metadata.category,
+        word_count: doc.metadata.word_count,
+      }));
+
+      await table.add(data);
+
+      if ((i + batchSize) % 10000 === 0) {
+        console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+      }
+    }
+  }
+
+  async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
+    const table = await this.db.openTable(this.currentTable);
+
+    const results = await table
+      .vectorSearch(query)
+      .limit(limit)
+      .toArray();
+
+    return results.map(result => ({
+      id: result.id,
+      score: 1 - (result._distance || 0), // Convert distance to similarity
+      document: {
+        id: result.id,
+        text: result.text,
+        embedding: [],
+        metadata: {
+          source: result.source,
+          category: result.category,
+          author: '',
+          created_at: new Date(),
+          word_count: result.word_count,
+          tags: [],
+        },
+      },
+    }));
+  }
+
+  async filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]> {
+    const table = await this.db.openTable(this.currentTable);
+
+    // Build SQL-like where clause
+    const whereClauses: string[] = [];
+
+    if (filter.source) {
+      whereClauses.push(`source = '${filter.source}'`);
+    }
+    if (filter.category) {
+      whereClauses.push(`category = '${filter.category}'`);
+    }
+    if (filter.word_count_min) {
+      whereClauses.push(`word_count >= ${filter.word_count_min}`);
+    }
+    if (filter.word_count_max) {
+      whereClauses.push(`word_count <= ${filter.word_count_max}`);
+    }
+
+    const whereClause = whereClauses.join(' AND ');
+
+    let search = table.vectorSearch(query).limit(limit);
+
+    if (whereClause) {
+      search = search.where(whereClause);
+    }
+
+    const results = await search.toArray();
+
+    return results.map(result => ({
+      id: result.id,
+      score: 1 - (result._distance || 0),
+      document: {
+        id: result.id,
+        text: result.text,
+        embedding: [],
+        metadata: {
+          source: result.source,
+          category: result.category,
+          author: '',
+          created_at: new Date(),
+          word_count: result.word_count,
+          tags: [],
+        },
+      },
+    }));
+  }
+
+  async hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]> {
+    // Simplified - full hybrid search would use LanceDB's FTS
+    return this.vectorSearch(queryVector, limit);
+  }
+
+  async deleteCollection(name: string): Promise<void> {
+    await this.db.dropTable(name);
+  }
+
+  async getStats(): Promise<DatabaseStats> {
+    const table = await this.db.openTable(this.currentTable);
+    const count = await table.countRows();
+
+    return {
+      vectorCount: count,
+      indexSize: 0,
+      memoryUsage: 0,
+    };
+  }
+}
+```
+
+---
+
+## Phase 7: Benchmark Orchestration & API
+
+### 7.1 Main Service
+
+```typescript
+// src/modules/vector-benchmarks/vector-benchmarks.service.ts
+import { Injectable } from '@nestjs/common';
+import { PgVectorService } from './databases/pgvector/pgvector.service';
+import { ChromaDbService } from './databases/chromadb/chromadb.service';
+import { MilvusService } from './databases/milvus/milvus.service';
+import { QdrantService } from './databases/qdrant/qdrant.service';
+import { LanceDbService } from './databases/lancedb/lancedb.service';
+import { LatencyBenchmark } from './benchmarks/latency.benchmark';
+import { DatasetLoaderService } from './data-generators/dataset-loader.service';
+import { JsonReporterService } from './reporters/json-reporter.service';
+import { MarkdownReporterService } from './reporters/markdown-reporter.service';
+import { BenchmarkConfig, BenchmarkResult, VectorDatabaseService } from './interfaces/benchmark-result.interface';
+import { DatabaseType, BenchmarkType } from './vector-benchmarks.enums';
+
+@Injectable()
+export class VectorBenchmarksService {
+  constructor(
+    private pgvectorService: PgVectorService,
+    private chromadbService: ChromaDbService,
+    private milvusService: MilvusService,
+    private qdrantService: QdrantService,
+    private lancedbService: LanceDbService,
+    private latencyBenchmark: LatencyBenchmark,
+    private datasetLoader: DatasetLoaderService,
+    private jsonReporter: JsonReporterService,
+    private markdownReporter: MarkdownReporterService,
+  ) {}
+
+  async runBenchmark(config: BenchmarkConfig): Promise<BenchmarkResult> {
+    const service = this.getService(config.database);
+
+    // Generate dataset
+    console.log(`Generating ${config.vectorCount} vectors...`);
+    const documents = await this.datasetLoader.generateBenchmarkDataset(
+      config.vectorCount,
+      config.dimensions,
+    );
+
+    // Setup collection
+    console.log('Creating collection...');
+    await service.initialize();
+    await service.createCollection(`benchmark_${Date.now()}`, config.dimensions);
+
+    // Insert data
+    console.log('Inserting vectors...');
+    await service.insertVectors(documents);
+
+    // Generate queries
+    const queryVectors = documents.slice(0, 1000).map(doc => doc.embedding);
+
+    // Run benchmark
+    console.log(`Running ${config.queryType} benchmark...`);
+    const result = await this.latencyBenchmark.runBenchmark(
+      service,
+      queryVectors,
+      config,
+    );
+
+    return result;
+  }
+
+  async runAllBenchmarks(vectorCount: number = 100000): Promise<BenchmarkResult[]> {
+    const databases: DatabaseType[] = [
+      DatabaseType.PGVECTOR,
+      DatabaseType.CHROMADB,
+      DatabaseType.MILVUS,
+      DatabaseType.QDRANT,
+      DatabaseType.LANCEDB,
+    ];
+
+    const results: BenchmarkResult[] = [];
+
+    for (const database of databases) {
+      console.log(`\n=== Benchmarking ${database} ===\n`);
+
+      const config: BenchmarkConfig = {
+        database,
+        vectorCount,
+        dimensions: 1536,
+        concurrency: 10,
+        duration: 60,
+        queryType: 'similarity',
+        topK: 10,
+        recallTarget: 0.99,
+      };
+
+      try {
+        const result = await this.runBenchmark(config);
+        results.push(result);
+      } catch (error) {
+        console.error(`Failed to benchmark ${database}:`, error.message);
+      }
+    }
+
+    // Save results
+    await this.jsonReporter.saveResults(results, `benchmark_${Date.now()}.json`);
+    await this.markdownReporter.saveReport(results, `benchmark_${Date.now()}.md`);
+
+    return results;
+  }
+
+  private getService(database: DatabaseType): VectorDatabaseService {
+    switch (database) {
+      case DatabaseType.PGVECTOR:
+        return this.pgvectorService;
+      case DatabaseType.CHROMADB:
+        return this.chromadbService;
+      case DatabaseType.MILVUS:
+        return this.milvusService;
+      case DatabaseType.QDRANT:
+        return this.qdrantService;
+      case DatabaseType.LANCEDB:
+        return this.lancedbService;
+      default:
+        throw new Error(`Unknown database: ${database}`);
+    }
+  }
+}
+```
+
+### 7.2 Controller
+
+```typescript
+// src/modules/vector-benchmarks/vector-benchmarks.controller.ts
+import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { VectorBenchmarksService } from './vector-benchmarks.service';
+import { BenchmarkConfig } from './interfaces/benchmark-result.interface';
+
+@Controller('benchmarks')
+export class VectorBenchmarksController {
+  constructor(private benchmarksService: VectorBenchmarksService) {}
+
+  @Post('run')
+  async runBenchmark(@Body() config: BenchmarkConfig) {
+    return this.benchmarksService.runBenchmark(config);
+  }
+
+  @Post('run-all')
+  async runAllBenchmarks(@Body() body: { vectorCount?: number }) {
+    return this.benchmarksService.runAllBenchmarks(body.vectorCount);
+  }
+}
+```
+
+---
+
+## Implementation Checklist
+
+### Phase 1: Infrastructure
+- [ ] Create module structure
+- [ ] Define TypeScript interfaces
+- [ ] Implement base benchmark class
+- [ ] Create data generators
+- [ ] Setup reporters
+- [ ] Add environment variables
+- [ ] Create Docker Compose for databases
+
+### Phase 2: PGVector
+- [ ] Install dependencies
+- [ ] Implement PgVectorService
+- [ ] Add HNSW/IVFFlat indexing
+- [ ] Implement vector search
+- [ ] Implement filtered search
+- [ ] Write unit tests
+
+### Phase 3: ChromaDB
+- [ ] Install dependencies
+- [ ] Implement ChromaDbService
+- [ ] Implement vector search
+- [ ] Implement filtered search
+- [ ] Write unit tests
+
+### Phase 4: Milvus
+- [ ] Install dependencies
+- [ ] Implement MilvusService
+- [ ] Configure collection schema
+- [ ] Implement hybrid search
+- [ ] Write unit tests
+
+### Phase 5: Qdrant
+- [ ] Install dependencies
+- [ ] Implement QdrantService
+- [ ] Configure filterable HNSW
+- [ ] Implement payload indexes
+- [ ] Write unit tests
+
+### Phase 6: LanceDB
+- [ ] Install dependencies
+- [ ] Implement LanceDbService
+- [ ] Configure IVF-PQ indexes
+- [ ] Implement disk-based search
+- [ ] Write unit tests
+
+### Phase 7: Integration
+- [ ] Implement orchestration service
+- [ ] Create REST API
+- [ ] Add benchmark types
+- [ ] Implement result reporting
+- [ ] Write E2E tests
+- [ ] Generate final report
+
+---
+
+## Expected Outcomes
+
+### Deliverables
+
+1. **Working Implementation**: All 5 databases integrated with NestJS
+2. **Benchmark Suite**: Latency, throughput, filtering, hybrid search tests
+3. **Test Coverage**: Unit tests for each database service
+4. **Results Reports**: JSON, CSV, and Markdown formats
+5. **Docker Setup**: One-command database deployment
+6. **Documentation**: API documentation and usage guide
+
+### Key Metrics to Validate
+
+From the research report:
+
+1. ✅ PGVector: 471 QPS at 99% recall (50M vectors)
+2. ✅ Qdrant: Sub-10ms P99 latency
+3. ✅ Milvus: Hybrid search performance
+4. ✅ ChromaDB: Scalability limits
+5. ✅ LanceDB: Disk vs memory performance
+
+### Success Criteria
+
+1. All 5 databases successfully integrated
+2. Benchmarks run without errors
+3. Results match expected patterns from research
+4. Code follows existing NestJS conventions
+5. Tests pass with >80% coverage
+6. Documentation is complete and clear
+
+---
+
+## Usage
+
+### Starting Databases
+
+```bash
+# Start all database containers
+docker-compose -f docker-compose.benchmarks.yml up -d
+
+# Verify containers are running
+docker ps
+```
+
+### Running Benchmarks
+
+```bash
+# Start the application
+yarn start:dev
+
+# Run all benchmarks via API
+curl -X POST http://localhost:3000/benchmarks/run-all \
+  -H "Content-Type: application/json" \
+  -d '{"vectorCount": 100000}'
+
+# Run specific benchmark
+curl -X POST http://localhost:3000/benchmarks/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "database": "pgvector",
+    "vectorCount": 100000,
+    "dimensions": 1536,
+    "queryType": "similarity",
+    "topK": 10,
+    "recallTarget": 0.99
+  }'
+```
+
+### Viewing Results
+
+```bash
+# Check results directory
+ls -la benchmark-results/
+
+# View latest results
+cat benchmark-results/benchmark_*.json
+cat benchmark-results/benchmark_*.md
+```
+
+---
+
+## Appendix: Key Dependencies
+
+```json
+{
+  "dependencies": {
+    "@nestjs/common": "^10.3.1",
+    "@nestjs/core": "^10.4.8",
+    "@nestjs/config": "^3.1.1",
     "@qdrant/js-client-rest": "^1.12.0",
     "@zilliz/milvus2-sdk-node": "^2.5.0",
     "@lancedb/lancedb": "^0.15.0",
     "chromadb": "^1.9.0",
     "pg": "^8.11.0",
-    "pgvector": "^0.2.0",
-    "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/pg": "^8.10.0",
-    "typescript": "^5.0.0",
-    "tsx": "^4.0.0"
+    "pgvector": "^0.2.0"
   }
 }
 ```
 
 ---
 
-## Next Steps
-
-1. **Approval**: Review and approve this plan
-2. **Environment Setup**: Provision hardware/cloud resources
-3. **Phase 1 Kickoff**: Begin PGVector implementation
-4. **Iterative Execution**: Complete phases sequentially
-5. **Continuous Documentation**: Update RESULTS.md as data is collected
-6. **Peer Review**: Validate methodology and findings with community
-7. **Publication**: Share results on GitHub + technical blog posts
-
----
-
-**Document Version**: 1.0
+**Document Version**: 2.0 (Implementation-Focused)
 **Last Updated**: 2025-11-09
-**Author**: Claude AI (Anthropic)
-**Status**: Ready for Implementation
+**Status**: Ready for AI Implementation
