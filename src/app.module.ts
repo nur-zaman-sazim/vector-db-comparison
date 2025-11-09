@@ -19,6 +19,7 @@ import { PdfGenerationModule } from "./modules/pdf-generation/pdf-generation.mod
 import { RolesModule } from "./modules/roles/roles.module";
 import { UserProfilesModule } from "./modules/user-profiles/user-profiles.module";
 import { UsersModule } from "./modules/users/users.module";
+import { VectorBenchmarksModule } from "./modules/vector-benchmarks/vector-benchmarks.module";
 import { VerificationRequestsModule } from "./modules/verification-requests/verification-requests.module";
 import { WebsocketExampleModule } from "./modules/websocket-example/websocket-example.module";
 import { PermissionsModule } from "./permissions/permissions.module";
@@ -59,6 +60,7 @@ import { PermissionsModule } from "./permissions/permissions.module";
     DocumentSigningModule,
     VerificationRequestsModule,
     PermissionsModule,
+    VectorBenchmarksModule,
   ],
   controllers: [],
   providers: [Logger],
