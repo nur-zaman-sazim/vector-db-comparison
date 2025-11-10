@@ -1,28 +1,28 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Pool, PoolClient } from 'pg';
-import pgvector from 'pgvector/pg';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+
+import { Pool, PoolClient } from "pg";
+import pgvector from "pgvector/pg";
+
 import {
   VectorDatabaseService,
   BenchmarkDocument,
   SearchResult,
   DatabaseStats,
   MetadataFilter,
-} from '../../interfaces/benchmark-result.interface';
+} from "../../interfaces/benchmark-result.interface";
 
 @Injectable()
-export class PgVectorService
-  implements VectorDatabaseService, OnModuleInit, OnModuleDestroy
-{
+export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PgVectorService.name);
-  private pool: Pool;
-  private currentCollection: string;
+  private pool!: Pool;
+  private currentCollection!: string;
 
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
     // Use existing DATABASE_URL from the application
-    const databaseUrl = this.configService.get<string>('DATABASE_URL');
+    const databaseUrl = this.configService.get<string>("DATABASE_URL");
 
     this.pool = new Pool({
       connectionString: databaseUrl,
@@ -33,7 +33,7 @@ export class PgVectorService
     const client = await this.pool.connect();
     try {
       await pgvector.registerType(client);
-      this.logger.log('PGVector connection established using DATABASE_URL');
+      this.logger.log("PGVector connection established using DATABASE_URL");
     } finally {
       client.release();
     }
@@ -41,12 +41,12 @@ export class PgVectorService
 
   async onModuleDestroy() {
     await this.pool.end();
-    this.logger.log('PGVector connection closed');
+    this.logger.log("PGVector connection closed");
   }
 
   async initialize(): Promise<void> {
-    await this.pool.query('CREATE EXTENSION IF NOT EXISTS vector');
-    this.logger.log('Vector extension initialized');
+    await this.pool.query("CREATE EXTENSION IF NOT EXISTS vector");
+    this.logger.log("Vector extension initialized");
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -77,30 +77,30 @@ export class PgVectorService
     this.logger.log(`Collection "${name}" created with ${dimensions} dimensions`);
   }
 
-  async createVectorIndex(indexType: 'hnsw' | 'ivfflat' = 'hnsw'): Promise<void> {
+  async createVectorIndex(indexType: "hnsw" | "ivfflat" = "hnsw"): Promise<void> {
     const tableName = this.currentCollection;
 
-    if (indexType === 'hnsw') {
+    if (indexType === "hnsw") {
       await this.pool.query(`
         CREATE INDEX ON ${tableName}
         USING hnsw (embedding vector_cosine_ops)
         WITH (m = 16, ef_construction = 64)
       `);
-      this.logger.log('HNSW index created');
+      this.logger.log("HNSW index created");
     } else {
       await this.pool.query(`
         CREATE INDEX ON ${tableName}
         USING ivfflat (embedding vector_cosine_ops)
         WITH (lists = 100)
       `);
-      this.logger.log('IVFFlat index created');
+      this.logger.log("IVFFlat index created");
     }
   }
 
   async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
     const client = await this.pool.connect();
     try {
-      await client.query('BEGIN');
+      await client.query("BEGIN");
 
       const batchSize = 1000;
       for (let i = 0; i < documents.length; i += batchSize) {
@@ -108,9 +108,11 @@ export class PgVectorService
         const values = batch
           .map((doc, idx) => {
             const base = idx * 8;
-            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`;
+            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${
+              base + 6
+            }, $${base + 7}, $${base + 8})`;
           })
-          .join(',');
+          .join(",");
 
         const params = batch.flatMap((doc) => [
           doc.id,
@@ -137,11 +139,11 @@ export class PgVectorService
         }
       }
 
-      await client.query('COMMIT');
+      await client.query("COMMIT");
       this.logger.log(`Inserted ${documents.length} vectors successfully`);
     } catch (error) {
-      await client.query('ROLLBACK');
-      this.logger.error(`Insert failed: ${error.message}`);
+      await client.query("ROLLBACK");
+      this.logger.error(`Insert failed: `);
       throw error;
     } finally {
       client.release();
@@ -229,8 +231,7 @@ export class PgVectorService
         paramIndex++;
       }
 
-      const whereClause =
-        whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+      const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
       params.push(limit);
 
       const result = await client.query(

@@ -1,18 +1,20 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@mikro-orm/nestjs';
-import { LatencyBenchmark } from './benchmarks/latency.benchmark';
-import { DatasetLoaderService } from './data-generators/dataset-loader.service';
-import { JsonReporterService } from './reporters/json-reporter.service';
-import { MarkdownReporterService } from './reporters/markdown-reporter.service';
-import { ConsoleReporterService } from './reporters/console-reporter.service';
+import { Injectable, Logger } from "@nestjs/common";
+
+import { InjectRepository } from "@mikro-orm/nestjs";
+
+import { BenchmarkResult } from "../../common/entities/benchmark-results.entity";
+import { BenchmarkResultsRepository } from "./benchmark-results.repository";
+import { LatencyBenchmark } from "./benchmarks/latency.benchmark";
+import { DatasetLoaderService } from "./data-generators/dataset-loader.service";
 import {
   BenchmarkConfig,
   BenchmarkResult as BenchmarkResultInterface,
   VectorDatabaseService,
-} from './interfaces/benchmark-result.interface';
-import { DatabaseType, BenchmarkType } from './vector-benchmarks.enums';
-import { BenchmarkResult } from '../../common/entities/benchmark-results.entity';
-import { BenchmarkResultsRepository } from './benchmark-results.repository';
+} from "./interfaces/benchmark-result.interface";
+import { ConsoleReporterService } from "./reporters/console-reporter.service";
+import { JsonReporterService } from "./reporters/json-reporter.service";
+import { MarkdownReporterService } from "./reporters/markdown-reporter.service";
+import { DatabaseType, BenchmarkType } from "./vector-benchmarks.enums";
 
 @Injectable()
 export class VectorBenchmarksService {
@@ -29,10 +31,7 @@ export class VectorBenchmarksService {
     private consoleReporter: ConsoleReporterService,
   ) {}
 
-  registerDatabaseService(
-    type: DatabaseType,
-    service: VectorDatabaseService,
-  ): void {
+  registerDatabaseService(type: DatabaseType, service: VectorDatabaseService): void {
     this.databaseServices.set(type, service);
     this.logger.log(`Registered database service: ${type}`);
   }
@@ -45,7 +44,9 @@ export class VectorBenchmarksService {
 
     if (!service) {
       throw new Error(
-        `Database service not registered: ${config.database}. Available: ${Array.from(this.databaseServices.keys()).join(', ')}`,
+        `Database service not registered: ${config.database}. Available: ${Array.from(
+          this.databaseServices.keys(),
+        ).join(", ")}`,
       );
     }
 
@@ -59,13 +60,13 @@ export class VectorBenchmarksService {
     );
 
     // Setup collection
-    this.logger.log('Creating collection...');
+    this.logger.log("Creating collection...");
     await service.initialize();
     const collectionName = `benchmark_${Date.now()}`;
     await service.createCollection(collectionName, config.dimensions);
 
     // Insert data
-    this.logger.log('Inserting vectors...');
+    this.logger.log("Inserting vectors...");
     await service.insertVectors(documents);
 
     // Generate queries
@@ -73,11 +74,7 @@ export class VectorBenchmarksService {
 
     // Run benchmark
     this.logger.log(`Running ${config.queryType} benchmark...`);
-    const result = await this.latencyBenchmark.runBenchmark(
-      service,
-      queryVectors,
-      config,
-    );
+    const result = await this.latencyBenchmark.runBenchmark(service, queryVectors, config);
 
     // Print results
     this.consoleReporter.printResult(result);
@@ -90,17 +87,15 @@ export class VectorBenchmarksService {
     // Cleanup
     try {
       await service.deleteCollection(collectionName);
-      this.logger.log('Collection deleted');
+      this.logger.log("Collection deleted");
     } catch (error) {
-      this.logger.warn(`Failed to delete collection: ${error.message}`);
+      this.logger.warn(`Failed to delete collection: `);
     }
 
     return result;
   }
 
-  private async saveBenchmarkResult(
-    result: BenchmarkResultInterface,
-  ): Promise<void> {
+  private async saveBenchmarkResult(result: BenchmarkResultInterface): Promise<void> {
     try {
       const entity = this.benchmarkResultsRepo.create({
         databaseType: result.database as DatabaseType,
@@ -112,16 +107,14 @@ export class VectorBenchmarksService {
         environmentInfo: `Node ${process.version}, Platform: ${process.platform}`,
       });
 
-      await this.benchmarkResultsRepo.persistAndFlush(entity);
+      await this.benchmarkResultsRepo.getEntityManager().persistAndFlush(entity);
       this.logger.log(`Benchmark result saved to database (ID: ${entity.id})`);
     } catch (error) {
-      this.logger.error(`Failed to save benchmark result: ${error.message}`);
+      this.logger.error(`Failed to save benchmark result: `);
     }
   }
 
-  async runAllBenchmarks(
-    vectorCount: number = 100000,
-  ): Promise<BenchmarkResultInterface[]> {
+  async runAllBenchmarks(vectorCount: number = 100000): Promise<BenchmarkResultInterface[]> {
     const databases = Array.from(this.databaseServices.keys());
     const results: BenchmarkResultInterface[] = [];
 
@@ -134,7 +127,7 @@ export class VectorBenchmarksService {
         dimensions: 1536,
         concurrency: 10,
         duration: 60,
-        queryType: 'similarity',
+        queryType: "similarity",
         topK: 10,
         recallTarget: 0.99,
       };
@@ -143,17 +136,14 @@ export class VectorBenchmarksService {
         const result = await this.runBenchmark(config);
         results.push(result);
       } catch (error) {
-        this.logger.error(`Failed to benchmark ${database}: ${error.message}`);
+        this.logger.error(`Failed to benchmark ${database}: `);
       }
     }
 
     // Save results
     const timestamp = Date.now();
     await this.jsonReporter.saveResults(results, `benchmark_${timestamp}.json`);
-    await this.markdownReporter.saveReport(
-      results,
-      `benchmark_${timestamp}.md`,
-    );
+    await this.markdownReporter.saveReport(results, `benchmark_${timestamp}.md`);
 
     // Print summary
     this.consoleReporter.printSummary(results);
