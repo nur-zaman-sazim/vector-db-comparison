@@ -53,21 +53,34 @@ export class VectorBenchmarksService {
     this.logger.log(`Starting benchmark for ${config.database}`);
 
     // Generate dataset
-    this.logger.log(`Generating ${config.vectorCount} vectors...`);
+    this.logger.log(
+      `Generating ${config.vectorCount} vectors with ${config.dimensions} dimensions...`,
+    );
+    const datasetStart = Date.now();
     const documents = await this.datasetLoader.generateBenchmarkDataset(
       config.vectorCount,
       config.dimensions,
     );
+    const datasetTime = (Date.now() - datasetStart) / 1000;
+    this.logger.log(`Dataset generation completed in ${datasetTime.toFixed(2)} seconds`);
 
     // Setup collection
-    this.logger.log("Creating collection...");
+    this.logger.log("Initializing database service...");
     await service.initialize();
     const collectionName = `benchmark_${Date.now()}`;
+    this.logger.log(`Creating collection: ${collectionName}`);
     await service.createCollection(collectionName, config.dimensions);
 
     // Insert data
-    this.logger.log("Inserting vectors...");
+    this.logger.log(`Inserting ${documents.length} vectors...`);
+    const insertStart = Date.now();
     await service.insertVectors(documents);
+    const insertTime = (Date.now() - insertStart) / 1000;
+    this.logger.log(
+      `Vector insertion completed in ${insertTime.toFixed(2)} seconds (${(
+        documents.length / insertTime
+      ).toFixed(2)} vectors/sec)`,
+    );
 
     // Generate queries
     const queryVectors = documents.slice(0, 1000).map((doc) => doc.embedding);
@@ -89,7 +102,9 @@ export class VectorBenchmarksService {
       await service.deleteCollection(collectionName);
       this.logger.log("Collection deleted");
     } catch (error) {
-      this.logger.warn(`Failed to delete collection: `);
+      this.logger.warn(
+        `Failed to delete collection: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     return result;
@@ -110,7 +125,11 @@ export class VectorBenchmarksService {
       await this.benchmarkResultsRepo.getEntityManager().persistAndFlush(entity);
       this.logger.log(`Benchmark result saved to database (ID: ${entity.id})`);
     } catch (error) {
-      this.logger.error(`Failed to save benchmark result: `);
+      this.logger.error(
+        `Failed to save benchmark result: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 
@@ -136,7 +155,11 @@ export class VectorBenchmarksService {
         const result = await this.runBenchmark(config);
         results.push(result);
       } catch (error) {
-        this.logger.error(`Failed to benchmark ${database}: `);
+        this.logger.error(
+          `Failed to benchmark ${database}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     }
 

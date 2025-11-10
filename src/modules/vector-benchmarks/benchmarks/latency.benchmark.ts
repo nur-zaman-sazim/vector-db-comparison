@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 
 import {
   VectorDatabaseService,
@@ -9,23 +9,57 @@ import { BaseBenchmark } from "./base.benchmark";
 
 @Injectable()
 export class LatencyBenchmark extends BaseBenchmark {
+  private readonly logger = new Logger(LatencyBenchmark.name);
+
   async runBenchmark(
     service: VectorDatabaseService,
     queryVectors: number[][],
     config: BenchmarkConfig,
   ): Promise<BenchmarkResult> {
+    this.logger.log(`Starting latency benchmark for ${config.database}`);
+    this.logger.log(`Configuration: ${JSON.stringify(config, null, 2)}`);
+    this.logger.log(`Running ${queryVectors.length} queries...`);
+
     const latencies: number[] = [];
     const startTime = Date.now();
+    let errors = 0;
 
-    for (const queryVector of queryVectors) {
-      const { latency } = await this.measureLatency(() =>
-        service.vectorSearch(queryVector, config.topK),
-      );
-      latencies.push(latency);
+    const progressInterval = Math.max(1, Math.floor(queryVectors.length / 10)); // Log every 10%
+
+    for (let i = 0; i < queryVectors.length; i++) {
+      const queryVector = queryVectors[i];
+
+      try {
+        const { latency } = await this.measureLatency(() =>
+          service.vectorSearch(queryVector, config.topK),
+        );
+        latencies.push(latency);
+      } catch (error) {
+        errors++;
+        this.logger.warn(
+          `Query ${i + 1} failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
+      // Log progress
+      if ((i + 1) % progressInterval === 0 || i === queryVectors.length - 1) {
+        const progress = (((i + 1) / queryVectors.length) * 100).toFixed(1);
+        const elapsed = (Date.now() - startTime) / 1000;
+        const qps = (i + 1) / elapsed;
+        this.logger.log(
+          `Progress: ${i + 1}/${queryVectors.length} queries (${progress}%) - ${qps.toFixed(
+            2,
+          )} QPS`,
+        );
+      }
     }
 
     const totalTime = (Date.now() - startTime) / 1000; // seconds
     const systemStats = this.getSystemStats();
+
+    this.logger.log(`Benchmark completed in ${totalTime.toFixed(2)} seconds`);
+    this.logger.log(`Total queries: ${queryVectors.length}, Errors: ${errors}`);
+    this.logger.log(`Average QPS: ${(queryVectors.length / totalTime).toFixed(2)}`);
 
     return {
       database: config.database,
@@ -41,7 +75,7 @@ export class LatencyBenchmark extends BaseBenchmark {
         recall: config.recallTarget,
         memoryUsedMB: systemStats.memoryUsage,
         cpuUtilization: systemStats.cpuUsage,
-        errors: 0,
+        errors,
         totalQueries: queryVectors.length,
       },
     };
