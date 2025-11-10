@@ -29,8 +29,14 @@ export class PgVectorService
       max: 20,
     });
 
-    await pgvector.registerType(this.pool);
-    this.logger.log('PGVector connection established using DATABASE_URL');
+    // Register pgvector types with a client from the pool
+    const client = await this.pool.connect();
+    try {
+      await pgvector.registerType(client);
+      this.logger.log('PGVector connection established using DATABASE_URL');
+    } finally {
+      client.release();
+    }
   }
 
   async onModuleDestroy() {
