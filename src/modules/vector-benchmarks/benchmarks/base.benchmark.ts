@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { performance } from 'perf_hooks';
+import { Injectable } from "@nestjs/common";
+
+import { performance } from "perf_hooks";
 
 @Injectable()
 export abstract class BaseBenchmark {
@@ -13,23 +14,18 @@ export abstract class BaseBenchmark {
     return values.reduce((sum, val) => sum + val, 0) / values.length;
   }
 
-  protected async measureLatency<T>(
-    fn: () => Promise<T>,
-  ): Promise<{ result: T; latency: number }> {
+  protected async measureLatency<T>(fn: () => Promise<T>): Promise<{ result: T; latency: number }> {
     const start = performance.now();
     const result = await fn();
     const latency = performance.now() - start;
     return { result, latency };
   }
 
-  protected async runConcurrent<T>(
-    tasks: (() => Promise<T>)[],
-    concurrency: number,
-  ): Promise<T[]> {
+  protected async runConcurrent<T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<T[]> {
     const results: T[] = [];
     for (let i = 0; i < tasks.length; i += concurrency) {
       const batch = tasks.slice(i, i + concurrency);
-      const batchResults = await Promise.all(batch.map(task => task()));
+      const batchResults = await Promise.all(batch.map((task) => task()));
       results.push(...batchResults);
     }
     return results;

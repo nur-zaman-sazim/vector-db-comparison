@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { BaseBenchmark } from './base.benchmark';
+import { Injectable } from "@nestjs/common";
+
 import {
   VectorDatabaseService,
   BenchmarkResult,
   BenchmarkConfig,
-} from '../interfaces/benchmark-result.interface';
+} from "../interfaces/benchmark-result.interface";
+import { BaseBenchmark } from "./base.benchmark";
 
 @Injectable()
 export class LatencyBenchmark extends BaseBenchmark {
@@ -28,7 +29,7 @@ export class LatencyBenchmark extends BaseBenchmark {
 
     return {
       database: config.database,
-      testName: 'Latency Test',
+      testName: "Latency Test",
       timestamp: new Date(),
       config,
       metrics: {

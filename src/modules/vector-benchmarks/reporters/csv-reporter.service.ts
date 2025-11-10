@@ -1,12 +1,14 @@
-import { Injectable } from '@nestjs/common';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { BenchmarkResult } from '../interfaces/benchmark-result.interface';
+import { Injectable } from "@nestjs/common";
+
+import { writeFile, mkdir } from "fs/promises";
+import { join } from "path";
+
+import { BenchmarkResult } from "../interfaces/benchmark-result.interface";
 
 @Injectable()
 export class CsvReporterService {
   private async ensureDirectory(): Promise<string> {
-    const outputDir = join(process.cwd(), 'benchmark-results');
+    const outputDir = join(process.cwd(), "benchmark-results");
     await mkdir(outputDir, { recursive: true });
     return outputDir;
   }
@@ -21,23 +23,23 @@ export class CsvReporterService {
 
   private generateCsv(results: BenchmarkResult[]): string {
     const headers = [
-      'Database',
-      'Test Name',
-      'Timestamp',
-      'Vector Count',
-      'Dimensions',
-      'Top K',
-      'Query Type',
-      'P50 Latency (ms)',
-      'P90 Latency (ms)',
-      'P99 Latency (ms)',
-      'Mean Latency (ms)',
-      'QPS',
-      'Recall',
-      'Memory (MB)',
-      'CPU Utilization',
-      'Errors',
-      'Total Queries',
+      "Database",
+      "Test Name",
+      "Timestamp",
+      "Vector Count",
+      "Dimensions",
+      "Top K",
+      "Query Type",
+      "P50 Latency (ms)",
+      "P90 Latency (ms)",
+      "P99 Latency (ms)",
+      "Mean Latency (ms)",
+      "QPS",
+      "Recall",
+      "Memory (MB)",
+      "CPU Utilization",
+      "Errors",
+      "Total Queries",
     ];
 
     const rows = results.map((result) => [
@@ -60,6 +62,6 @@ export class CsvReporterService {
       result.metrics.totalQueries.toString(),
     ]);
 
-    return [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
   }
 }

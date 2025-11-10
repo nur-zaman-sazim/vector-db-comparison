@@ -1,4 +1,4 @@
-import { Migration } from '@mikro-orm/migrations';
+import { Migration } from "@mikro-orm/migrations";
 
 export class Migration20251109233000_add_benchmark_results extends Migration {
   async up(): Promise<void> {

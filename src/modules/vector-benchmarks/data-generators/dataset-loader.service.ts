@@ -1,18 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { EmbeddingGeneratorService } from './embedding-generator.service';
-import { BenchmarkDocument } from '../interfaces/benchmark-result.interface';
+import { Injectable } from "@nestjs/common";
+
+import { BenchmarkDocument } from "../interfaces/benchmark-result.interface";
+import { EmbeddingGeneratorService } from "./embedding-generator.service";
 
 @Injectable()
 export class DatasetLoaderService {
   constructor(private embeddingGenerator: EmbeddingGeneratorService) {}
 
-  async generateBenchmarkDataset(
-    count: number,
-    dimensions: number,
-  ): Promise<BenchmarkDocument[]> {
+  async generateBenchmarkDataset(count: number, dimensions: number): Promise<BenchmarkDocument[]> {
     const documents: BenchmarkDocument[] = [];
-    const categories = ['tech', 'science', 'health', 'business', 'sports'];
-    const sources = ['wikipedia', 'arxiv', 'stackoverflow', 'medium', 'blogs'];
+    const categories = ["tech", "science", "health", "business", "sports"];
+    const sources = ["wikipedia", "arxiv", "stackoverflow", "medium", "blogs"];
 
     for (let i = 0; i < count; i++) {
       documents.push({
@@ -40,28 +38,24 @@ export class DatasetLoaderService {
 
   private generateRandomText(): string {
     const words = [
-      'vector',
-      'database',
-      'search',
-      'embedding',
-      'semantic',
-      'query',
-      'index',
-      'performance',
-      'benchmark',
-      'test',
+      "vector",
+      "database",
+      "search",
+      "embedding",
+      "semantic",
+      "query",
+      "index",
+      "performance",
+      "benchmark",
+      "test",
     ];
     const length = Math.floor(Math.random() * 50) + 10;
-    return Array.from({ length }, () =>
-      words[Math.floor(Math.random() * words.length)],
-    ).join(' ');
+    return Array.from({ length }, () => words[Math.floor(Math.random() * words.length)]).join(" ");
   }
 
   private generateRandomTags(): string[] {
-    const allTags = ['ml', 'ai', 'nlp', 'cv', 'rag', 'llm', 'data', 'analytics'];
+    const allTags = ["ml", "ai", "nlp", "cv", "rag", "llm", "data", "analytics"];
     const count = Math.floor(Math.random() * 3) + 1;
-    return Array.from({ length: count }, () =>
-      allTags[Math.floor(Math.random() * allTags.length)],
-    );
+    return Array.from({ length: count }, () => allTags[Math.floor(Math.random() * allTags.length)]);
   }
 }
