@@ -21,11 +21,7 @@ export interface IEnvironmentVariables {
   SEND_FROM_EMAIL: string;
 
   // Vector Database Configuration
-  PGVECTOR_HOST?: string;
-  PGVECTOR_PORT?: number;
-  PGVECTOR_DATABASE?: string;
-  PGVECTOR_USER?: string;
-  PGVECTOR_PASSWORD?: string;
+  // PGVector uses the main DATABASE_URL connection
 
   CHROMADB_URL?: string;
 
