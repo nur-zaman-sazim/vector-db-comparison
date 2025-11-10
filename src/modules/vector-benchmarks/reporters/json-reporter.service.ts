@@ -1,12 +1,14 @@
-import { Injectable } from '@nestjs/common';
-import { writeFile, readFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { BenchmarkResult } from '../interfaces/benchmark-result.interface';
+import { Injectable } from "@nestjs/common";
+
+import { writeFile, readFile, mkdir } from "fs/promises";
+import { join } from "path";
+
+import { BenchmarkResult } from "../interfaces/benchmark-result.interface";
 
 @Injectable()
 export class JsonReporterService {
   private async ensureDirectory(): Promise<string> {
-    const outputDir = join(process.cwd(), 'benchmark-results');
+    const outputDir = join(process.cwd(), "benchmark-results");
     await mkdir(outputDir, { recursive: true });
     return outputDir;
   }
@@ -21,7 +23,7 @@ export class JsonReporterService {
   async loadResults(filename: string): Promise<BenchmarkResult[]> {
     const outputDir = await this.ensureDirectory();
     const inputPath = join(outputDir, filename);
-    const data = await readFile(inputPath, 'utf-8');
+    const data = await readFile(inputPath, "utf-8");
     return JSON.parse(data);
   }
 }

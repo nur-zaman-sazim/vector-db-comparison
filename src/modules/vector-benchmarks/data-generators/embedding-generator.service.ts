@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 
 @Injectable()
 export class EmbeddingGeneratorService {
@@ -19,9 +19,7 @@ export class EmbeddingGeneratorService {
   }
 
   private normalize(vector: number[]): number[] {
-    const magnitude = Math.sqrt(
-      vector.reduce((sum, val) => sum + val * val, 0),
-    );
+    const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
     return vector.map((val) => val / magnitude);
   }
 }

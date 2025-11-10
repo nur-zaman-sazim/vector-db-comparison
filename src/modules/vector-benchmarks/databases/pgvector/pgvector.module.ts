@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { PgVectorService } from './pgvector.service';
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+
+import { PgVectorService } from "./pgvector.service";
 
 @Module({
   imports: [ConfigModule],

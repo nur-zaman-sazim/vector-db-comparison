@@ -13,12 +13,12 @@ export interface BenchmarkDocument {
 }
 
 export interface BenchmarkConfig {
-  database: 'pgvector' | 'chromadb' | 'milvus' | 'qdrant' | 'lancedb';
+  database: "pgvector" | "chromadb" | "milvus" | "qdrant" | "lancedb";
   vectorCount: number;
   dimensions: number;
   concurrency: number;
   duration: number; // seconds
-  queryType: 'similarity' | 'filter' | 'hybrid';
+  queryType: "similarity" | "filter" | "hybrid";
   topK: number;
   recallTarget: number;
 }
@@ -70,16 +70,8 @@ export interface VectorDatabaseService {
   createCollection(name: string, dimensions: number): Promise<void>;
   insertVectors(documents: BenchmarkDocument[]): Promise<void>;
   vectorSearch(query: number[], limit: number): Promise<SearchResult[]>;
-  filteredSearch(
-    query: number[],
-    filter: MetadataFilter,
-    limit: number,
-  ): Promise<SearchResult[]>;
-  hybridSearch(
-    queryVector: number[],
-    queryText: string,
-    limit: number,
-  ): Promise<SearchResult[]>;
+  filteredSearch(query: number[], filter: MetadataFilter, limit: number): Promise<SearchResult[]>;
+  hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]>;
   deleteCollection(name: string): Promise<void>;
   getStats(): Promise<DatabaseStats>;
 }

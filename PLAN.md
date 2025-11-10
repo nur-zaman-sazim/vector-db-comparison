@@ -91,12 +91,14 @@ src/
 ### Test Environment
 
 **Hardware Assumptions**:
+
 - Multi-core CPU (actual cores will be detected at runtime)
 - Sufficient RAM for vector operations (will be measured)
 - SSD storage
 - Docker support for database containers
 
 **Software Stack**:
+
 - Node.js v20 (already configured)
 - TypeScript
 - NestJS (existing framework)
@@ -107,6 +109,7 @@ src/
 ### Standard Test Dataset
 
 **Document Schema**:
+
 ```typescript
 export interface BenchmarkDocument {
   id: string;
@@ -131,33 +134,39 @@ export interface BenchmarkDocument {
 All benchmarks will be implemented as services following NestJS patterns:
 
 #### Test 1: Vector Similarity Search
+
 - Pure cosine similarity / L2 distance
 - Top-K: 10, 50, 100
 - Recall Target: 95%, 99%
 - Metrics: P50/P99 latency, QPS (1/10/100 concurrent clients)
 
 #### Test 2: Metadata Filtering
+
 - Filter Selectivity: 1%, 10%, 50%, 90%
 - Single condition, range filter, multi-condition
 - Metrics: Latency overhead vs baseline, recall degradation
 
 #### Test 3: Hybrid Search
+
 - Vector + BM25 keyword search
 - Fusion: RRF, weighted combination
 - Alpha weights: [0.3, 0.5, 0.7]
 - Metrics: End-to-end latency, result quality (NDCG@10)
 
 #### Test 4: Reranking Pipeline
+
 - Pattern: Retrieve 50 → Rerank to 10
 - Metrics: Total pipeline latency, accuracy improvement
 
 #### Test 5: Indexing Performance
+
 - Bulk insert (100K vectors)
 - Incremental insert (1K vectors/batch)
 - Index rebuild time
 - Metrics: Insertion throughput, index build time, memory consumption
 
 #### Test 6: Concurrent Load Testing
+
 - Sustained: 100 QPS for 10 minutes
 - Burst: Spike to 500 QPS for 30 seconds
 - Mixed: 70% reads, 20% writes, 10% deletes
@@ -173,12 +182,12 @@ All benchmarks will be implemented as services following NestJS patterns:
 
 ```typescript
 // src/modules/vector-benchmarks/vector-benchmarks.module.ts
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { VectorBenchmarksController } from './vector-benchmarks.controller';
-import { VectorBenchmarksService } from './vector-benchmarks.service';
-import { DataGeneratorModule } from './data-generators/data-generator.module';
-import { ReporterModule } from './reporters/reporter.module';
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { VectorBenchmarksController } from "./vector-benchmarks.controller";
+import { VectorBenchmarksService } from "./vector-benchmarks.service";
+import { DataGeneratorModule } from "./data-generators/data-generator.module";
+import { ReporterModule } from "./reporters/reporter.module";
 
 @Module({
   imports: [ConfigModule, DataGeneratorModule, ReporterModule],
@@ -196,12 +205,12 @@ export class VectorBenchmarksModule {}
 ```typescript
 // src/modules/vector-benchmarks/interfaces/benchmark-result.interface.ts
 export interface BenchmarkConfig {
-  database: 'pgvector' | 'chromadb' | 'milvus' | 'qdrant' | 'lancedb';
+  database: "pgvector" | "chromadb" | "milvus" | "qdrant" | "lancedb";
   vectorCount: number;
   dimensions: number;
   concurrency: number;
   duration: number; // seconds
-  queryType: 'similarity' | 'filter' | 'hybrid';
+  queryType: "similarity" | "filter" | "hybrid";
   topK: number;
   recallTarget: number;
 }
@@ -254,20 +263,20 @@ export interface DatabaseStats {
 ```typescript
 // src/modules/vector-benchmarks/vector-benchmarks.enums.ts
 export enum DatabaseType {
-  PGVECTOR = 'pgvector',
-  CHROMADB = 'chromadb',
-  MILVUS = 'milvus',
-  QDRANT = 'qdrant',
-  LANCEDB = 'lancedb',
+  PGVECTOR = "pgvector",
+  CHROMADB = "chromadb",
+  MILVUS = "milvus",
+  QDRANT = "qdrant",
+  LANCEDB = "lancedb",
 }
 
 export enum BenchmarkType {
-  LATENCY = 'latency',
-  THROUGHPUT = 'throughput',
-  HYBRID_SEARCH = 'hybrid_search',
-  FILTERING = 'filtering',
-  INDEXING = 'indexing',
-  CONCURRENT_LOAD = 'concurrent_load',
+  LATENCY = "latency",
+  THROUGHPUT = "throughput",
+  HYBRID_SEARCH = "hybrid_search",
+  FILTERING = "filtering",
+  INDEXING = "indexing",
+  CONCURRENT_LOAD = "concurrent_load",
 }
 
 // src/modules/vector-benchmarks/vector-benchmarks.constants.ts
@@ -277,7 +286,7 @@ export const BENCHMARK_CONSTANTS = {
   DEFAULT_TOP_K: 10,
   DEFAULT_RECALL_TARGET: 0.99,
   DEFAULT_CONCURRENCY: 10,
-  COLLECTION_PREFIX: 'benchmark_',
+  COLLECTION_PREFIX: "benchmark_",
 };
 ```
 
@@ -285,7 +294,7 @@ export const BENCHMARK_CONSTANTS = {
 
 ```typescript
 // src/modules/vector-benchmarks/data-generators/embedding-generator.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 
 @Injectable()
 export class EmbeddingGeneratorService {
@@ -307,25 +316,22 @@ export class EmbeddingGeneratorService {
 
   private normalize(vector: number[]): number[] {
     const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
-    return vector.map(val => val / magnitude);
+    return vector.map((val) => val / magnitude);
   }
 }
 
 // src/modules/vector-benchmarks/data-generators/dataset-loader.service.ts
-import { Injectable } from '@nestjs/common';
-import { EmbeddingGeneratorService } from './embedding-generator.service';
+import { Injectable } from "@nestjs/common";
+import { EmbeddingGeneratorService } from "./embedding-generator.service";
 
 @Injectable()
 export class DatasetLoaderService {
   constructor(private embeddingGenerator: EmbeddingGeneratorService) {}
 
-  async generateBenchmarkDataset(
-    count: number,
-    dimensions: number,
-  ): Promise<BenchmarkDocument[]> {
+  async generateBenchmarkDataset(count: number, dimensions: number): Promise<BenchmarkDocument[]> {
     const documents: BenchmarkDocument[] = [];
-    const categories = ['tech', 'science', 'health', 'business', 'sports'];
-    const sources = ['wikipedia', 'arxiv', 'stackoverflow', 'medium', 'blogs'];
+    const categories = ["tech", "science", "health", "business", "sports"];
+    const sources = ["wikipedia", "arxiv", "stackoverflow", "medium", "blogs"];
 
     for (let i = 0; i < count; i++) {
       documents.push({
@@ -352,20 +358,26 @@ export class DatasetLoaderService {
   }
 
   private generateRandomText(): string {
-    const words = ['vector', 'database', 'search', 'embedding', 'semantic',
-                   'query', 'index', 'performance', 'benchmark', 'test'];
+    const words = [
+      "vector",
+      "database",
+      "search",
+      "embedding",
+      "semantic",
+      "query",
+      "index",
+      "performance",
+      "benchmark",
+      "test",
+    ];
     const length = Math.floor(Math.random() * 50) + 10;
-    return Array.from({ length }, () =>
-      words[Math.floor(Math.random() * words.length)]
-    ).join(' ');
+    return Array.from({ length }, () => words[Math.floor(Math.random() * words.length)]).join(" ");
   }
 
   private generateRandomTags(): string[] {
-    const allTags = ['ml', 'ai', 'nlp', 'cv', 'rag', 'llm', 'data', 'analytics'];
+    const allTags = ["ml", "ai", "nlp", "cv", "rag", "llm", "data", "analytics"];
     const count = Math.floor(Math.random() * 3) + 1;
-    return Array.from({ length: count }, () =>
-      allTags[Math.floor(Math.random() * allTags.length)]
-    );
+    return Array.from({ length: count }, () => allTags[Math.floor(Math.random() * allTags.length)]);
   }
 }
 ```
@@ -374,8 +386,8 @@ export class DatasetLoaderService {
 
 ```typescript
 // src/modules/vector-benchmarks/benchmarks/base.benchmark.ts
-import { Injectable } from '@nestjs/common';
-import { performance } from 'perf_hooks';
+import { Injectable } from "@nestjs/common";
+import { performance } from "perf_hooks";
 
 @Injectable()
 export abstract class BaseBenchmark {
@@ -389,23 +401,18 @@ export abstract class BaseBenchmark {
     return values.reduce((sum, val) => sum + val, 0) / values.length;
   }
 
-  protected async measureLatency<T>(
-    fn: () => Promise<T>,
-  ): Promise<{ result: T; latency: number }> {
+  protected async measureLatency<T>(fn: () => Promise<T>): Promise<{ result: T; latency: number }> {
     const start = performance.now();
     const result = await fn();
     const latency = performance.now() - start;
     return { result, latency };
   }
 
-  protected async runConcurrent<T>(
-    tasks: (() => Promise<T>)[],
-    concurrency: number,
-  ): Promise<T[]> {
+  protected async runConcurrent<T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<T[]> {
     const results: T[] = [];
     for (let i = 0; i < tasks.length; i += concurrency) {
       const batch = tasks.slice(i, i + concurrency);
-      const batchResults = await Promise.all(batch.map(task => task()));
+      const batchResults = await Promise.all(batch.map((task) => task()));
       results.push(...batchResults);
     }
     return results;
@@ -427,49 +434,49 @@ export abstract class BaseBenchmark {
 
 ```typescript
 // src/modules/vector-benchmarks/reporters/json-reporter.service.ts
-import { Injectable } from '@nestjs/common';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
+import { Injectable } from "@nestjs/common";
+import { writeFile } from "fs/promises";
+import { join } from "path";
 
 @Injectable()
 export class JsonReporterService {
   async saveResults(results: BenchmarkResult[], filename: string): Promise<void> {
-    const outputPath = join(process.cwd(), 'benchmark-results', filename);
+    const outputPath = join(process.cwd(), "benchmark-results", filename);
     await writeFile(outputPath, JSON.stringify(results, null, 2));
     console.log(`Results saved to: ${outputPath}`);
   }
 
   async loadResults(filename: string): Promise<BenchmarkResult[]> {
-    const inputPath = join(process.cwd(), 'benchmark-results', filename);
-    const data = await readFile(inputPath, 'utf-8');
+    const inputPath = join(process.cwd(), "benchmark-results", filename);
+    const data = await readFile(inputPath, "utf-8");
     return JSON.parse(data);
   }
 }
 
 // src/modules/vector-benchmarks/reporters/markdown-reporter.service.ts
-import { Injectable } from '@nestjs/common';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
+import { Injectable } from "@nestjs/common";
+import { writeFile } from "fs/promises";
+import { join } from "path";
 
 @Injectable()
 export class MarkdownReporterService {
   async generateReport(results: BenchmarkResult[]): Promise<string> {
-    let markdown = '# Vector Database Benchmark Results\n\n';
+    let markdown = "# Vector Database Benchmark Results\n\n";
     markdown += `Generated: ${new Date().toISOString()}\n\n`;
 
     // Group by database
-    const byDatabase = this.groupBy(results, 'database');
+    const byDatabase = this.groupBy(results, "database");
 
     for (const [database, dbResults] of Object.entries(byDatabase)) {
       markdown += `## ${database}\n\n`;
 
       // Group by test type
-      const byTest = this.groupBy(dbResults, 'testName');
+      const byTest = this.groupBy(dbResults, "testName");
 
       for (const [testName, testResults] of Object.entries(byTest)) {
         markdown += `### ${testName}\n\n`;
         markdown += this.generateTable(testResults);
-        markdown += '\n\n';
+        markdown += "\n\n";
       }
     }
 
@@ -478,14 +485,14 @@ export class MarkdownReporterService {
 
   async saveReport(results: BenchmarkResult[], filename: string): Promise<void> {
     const markdown = await this.generateReport(results);
-    const outputPath = join(process.cwd(), 'benchmark-results', filename);
+    const outputPath = join(process.cwd(), "benchmark-results", filename);
     await writeFile(outputPath, markdown);
     console.log(`Report saved to: ${outputPath}`);
   }
 
   private generateTable(results: BenchmarkResult[]): string {
-    let table = '| Vector Count | P50 (ms) | P99 (ms) | QPS | Recall | Memory (MB) |\n';
-    table += '|--------------|----------|----------|-----|--------|-------------|\n';
+    let table = "| Vector Count | P50 (ms) | P99 (ms) | QPS | Recall | Memory (MB) |\n";
+    table += "|--------------|----------|----------|-----|--------|-------------|\n";
 
     for (const result of results) {
       table += `| ${result.config.vectorCount} | `;
@@ -543,7 +550,7 @@ BENCHMARK_CONCURRENCY?: number;
 Create `docker-compose.benchmarks.yml`:
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   # PGVector
@@ -649,6 +656,7 @@ volumes:
 ### 2.1 Dependencies
 
 Add to `package.json`:
+
 ```json
 {
   "dependencies": {
@@ -665,9 +673,9 @@ Add to `package.json`:
 
 ```typescript
 // src/modules/vector-benchmarks/databases/pgvector/pgvector.module.ts
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { PgVectorService } from './pgvector.service';
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { PgVectorService } from "./pgvector.service";
 
 @Module({
   imports: [ConfigModule],
@@ -681,11 +689,16 @@ export class PgVectorModule {}
 
 ```typescript
 // src/modules/vector-benchmarks/databases/pgvector/pgvector.service.ts
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Pool, PoolClient } from 'pg';
-import pgvector from 'pgvector/pg';
-import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
+import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Pool, PoolClient } from "pg";
+import pgvector from "pgvector/pg";
+import {
+  VectorDatabaseService,
+  BenchmarkDocument,
+  SearchResult,
+  DatabaseStats,
+} from "../../interfaces/benchmark-result.interface";
 
 @Injectable()
 export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnModuleDestroy {
@@ -696,16 +709,16 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
 
   async onModuleInit() {
     this.pool = new Pool({
-      host: this.configService.get('PGVECTOR_HOST', 'localhost'),
-      port: this.configService.get('PGVECTOR_PORT', 5433),
-      database: this.configService.get('PGVECTOR_DATABASE', 'benchmark_db'),
-      user: this.configService.get('PGVECTOR_USER', 'benchmark_user'),
-      password: this.configService.get('PGVECTOR_PASSWORD', 'benchmark_pass'),
+      host: this.configService.get("PGVECTOR_HOST", "localhost"),
+      port: this.configService.get("PGVECTOR_PORT", 5433),
+      database: this.configService.get("PGVECTOR_DATABASE", "benchmark_db"),
+      user: this.configService.get("PGVECTOR_USER", "benchmark_user"),
+      password: this.configService.get("PGVECTOR_PASSWORD", "benchmark_pass"),
       max: 20,
     });
 
     await pgvector.registerType(this.pool);
-    console.log('PGVector connection established');
+    console.log("PGVector connection established");
   }
 
   async onModuleDestroy() {
@@ -713,7 +726,7 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
   }
 
   async initialize(): Promise<void> {
-    await this.pool.query('CREATE EXTENSION IF NOT EXISTS vector');
+    await this.pool.query("CREATE EXTENSION IF NOT EXISTS vector");
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -742,10 +755,10 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
     await this.pool.query(`CREATE INDEX ON ${name}(category)`);
   }
 
-  async createVectorIndex(indexType: 'hnsw' | 'ivfflat' = 'hnsw'): Promise<void> {
+  async createVectorIndex(indexType: "hnsw" | "ivfflat" = "hnsw"): Promise<void> {
     const tableName = this.currentCollection;
 
-    if (indexType === 'hnsw') {
+    if (indexType === "hnsw") {
       await this.pool.query(`
         CREATE INDEX ON ${tableName}
         USING hnsw (embedding vector_cosine_ops)
@@ -763,18 +776,22 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
   async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
     const client = await this.pool.connect();
     try {
-      await client.query('BEGIN');
+      await client.query("BEGIN");
 
       // Batch insert
       const batchSize = 1000;
       for (let i = 0; i < documents.length; i += batchSize) {
         const batch = documents.slice(i, i + batchSize);
-        const values = batch.map((doc, idx) => {
-          const base = idx * 8;
-          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`;
-        }).join(',');
+        const values = batch
+          .map((doc, idx) => {
+            const base = idx * 8;
+            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${
+              base + 6
+            }, $${base + 7}, $${base + 8})`;
+          })
+          .join(",");
 
-        const params = batch.flatMap(doc => [
+        const params = batch.flatMap((doc) => [
           doc.id,
           doc.text,
           pgvector.toSql(doc.embedding),
@@ -789,17 +806,19 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
           `INSERT INTO ${this.currentCollection}
            (id, text, embedding, metadata, source, category, created_at, word_count)
            VALUES ${values}`,
-          params
+          params,
         );
 
         if ((i + batchSize) % 10000 === 0) {
-          console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+          console.log(
+            `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
+          );
         }
       }
 
-      await client.query('COMMIT');
+      await client.query("COMMIT");
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       throw error;
     } finally {
       client.release();
@@ -818,10 +837,10 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
          FROM ${this.currentCollection}
          ORDER BY embedding <=> $1
          LIMIT $2`,
-        [pgvector.toSql(query), limit]
+        [pgvector.toSql(query), limit],
       );
 
-      return result.rows.map(row => ({
+      return result.rows.map((row) => ({
         id: row.id,
         score: 1 - row.distance, // Convert distance to similarity score
         document: {
@@ -871,7 +890,7 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
         paramIndex++;
       }
 
-      const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+      const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
       params.push(limit);
 
       const result = await client.query(
@@ -880,10 +899,10 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
          ${whereClause}
          ORDER BY embedding <=> $1
          LIMIT $${paramIndex}`,
-        params
+        params,
       );
 
-      return result.rows.map(row => ({
+      return result.rows.map((row) => ({
         id: row.id,
         score: 1 - row.distance,
         document: {
@@ -898,7 +917,12 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
     }
   }
 
-  async hybridSearch(queryVector: number[], queryText: string, limit: number, alpha: number = 0.5): Promise<SearchResult[]> {
+  async hybridSearch(
+    queryVector: number[],
+    queryText: string,
+    limit: number,
+    alpha: number = 0.5,
+  ): Promise<SearchResult[]> {
     // Simplified hybrid search using RRF
     // In production, you'd add full-text search with tsvector
     const vectorResults = await this.vectorSearch(queryVector, 50);
@@ -913,12 +937,15 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
   }
 
   async getStats(): Promise<DatabaseStats> {
-    const result = await this.pool.query(`
+    const result = await this.pool.query(
+      `
       SELECT
         COUNT(*) as vector_count,
         pg_total_relation_size($1) as index_size
       FROM ${this.currentCollection}
-    `, [this.currentCollection]);
+    `,
+      [this.currentCollection],
+    );
 
     return {
       vectorCount: parseInt(result.rows[0].vector_count),
@@ -933,23 +960,23 @@ export class PgVectorService implements VectorDatabaseService, OnModuleInit, OnM
 
 ```typescript
 // src/modules/vector-benchmarks/benchmarks/latency.benchmark.ts
-import { Injectable } from '@nestjs/common';
-import { BaseBenchmark } from './base.benchmark';
-import { VectorDatabaseService, BenchmarkResult } from '../interfaces/benchmark-result.interface';
+import { Injectable } from "@nestjs/common";
+import { BaseBenchmark } from "./base.benchmark";
+import { VectorDatabaseService, BenchmarkResult } from "../interfaces/benchmark-result.interface";
 
 @Injectable()
 export class LatencyBenchmark extends BaseBenchmark {
   async runBenchmark(
     service: VectorDatabaseService,
     queryVectors: number[][],
-    config: any
+    config: any,
   ): Promise<BenchmarkResult> {
     const latencies: number[] = [];
     const startTime = Date.now();
 
     for (const queryVector of queryVectors) {
       const { latency } = await this.measureLatency(() =>
-        service.vectorSearch(queryVector, config.topK)
+        service.vectorSearch(queryVector, config.topK),
       );
       latencies.push(latency);
     }
@@ -959,7 +986,7 @@ export class LatencyBenchmark extends BaseBenchmark {
 
     return {
       database: config.database,
-      testName: 'Latency Test',
+      testName: "Latency Test",
       timestamp: new Date(),
       config,
       metrics: {
@@ -999,10 +1026,15 @@ export class LatencyBenchmark extends BaseBenchmark {
 
 ```typescript
 // src/modules/vector-benchmarks/databases/chromadb/chromadb.service.ts
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { ChromaClient, Collection } from 'chromadb';
-import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { ChromaClient, Collection } from "chromadb";
+import {
+  VectorDatabaseService,
+  BenchmarkDocument,
+  SearchResult,
+  DatabaseStats,
+} from "../../interfaces/benchmark-result.interface";
 
 @Injectable()
 export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
@@ -1012,9 +1044,9 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const url = this.configService.get('CHROMADB_URL', 'http://localhost:8000');
+    const url = this.configService.get("CHROMADB_URL", "http://localhost:8000");
     this.client = new ChromaClient({ path: url });
-    console.log('ChromaDB connection established');
+    console.log("ChromaDB connection established");
   }
 
   async initialize(): Promise<void> {
@@ -1031,10 +1063,10 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
     this.collection = await this.client.createCollection({
       name,
       metadata: {
-        'hnsw:space': 'cosine',
-        'hnsw:construction_ef': 100,
-        'hnsw:search_ef': 100,
-        'hnsw:M': 16,
+        "hnsw:space": "cosine",
+        "hnsw:construction_ef": 100,
+        "hnsw:search_ef": 100,
+        "hnsw:M": 16,
       },
     });
   }
@@ -1046,14 +1078,16 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
       const batch = documents.slice(i, i + batchSize);
 
       await this.collection.add({
-        ids: batch.map(doc => doc.id),
-        embeddings: batch.map(doc => doc.embedding),
-        metadatas: batch.map(doc => doc.metadata as any),
-        documents: batch.map(doc => doc.text),
+        ids: batch.map((doc) => doc.id),
+        embeddings: batch.map((doc) => doc.embedding),
+        metadatas: batch.map((doc) => doc.metadata as any),
+        documents: batch.map((doc) => doc.text),
       });
 
       if ((i + batchSize) % 10000 === 0) {
-        console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+        console.log(
+          `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
+        );
       }
     }
   }
@@ -1069,7 +1103,7 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
       score: 1 - (result.distances?.[0]?.[idx] || 0),
       document: {
         id: id as string,
-        text: result.documents?.[0]?.[idx] as string || '',
+        text: (result.documents?.[0]?.[idx] as string) || "",
         embedding: [],
         metadata: result.metadatas?.[0]?.[idx] as any,
       },
@@ -1088,14 +1122,18 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
       score: 1 - (result.distances?.[0]?.[idx] || 0),
       document: {
         id: id as string,
-        text: result.documents?.[0]?.[idx] as string || '',
+        text: (result.documents?.[0]?.[idx] as string) || "",
         embedding: [],
         metadata: result.metadatas?.[0]?.[idx] as any,
       },
     }));
   }
 
-  async hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]> {
+  async hybridSearch(
+    queryVector: number[],
+    queryText: string,
+    limit: number,
+  ): Promise<SearchResult[]> {
     // ChromaDB doesn't have built-in hybrid search
     // Fall back to vector search
     return this.vectorSearch(queryVector, limit);
@@ -1136,10 +1174,15 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
 
 ```typescript
 // src/modules/vector-benchmarks/databases/milvus/milvus.service.ts
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { MilvusClient, DataType, IndexType, MetricType } from '@zilliz/milvus2-sdk-node';
-import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { MilvusClient, DataType, IndexType, MetricType } from "@zilliz/milvus2-sdk-node";
+import {
+  VectorDatabaseService,
+  BenchmarkDocument,
+  SearchResult,
+  DatabaseStats,
+} from "../../interfaces/benchmark-result.interface";
 
 @Injectable()
 export class MilvusService implements VectorDatabaseService, OnModuleInit {
@@ -1150,17 +1193,17 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const host = this.configService.get('MILVUS_HOST', 'localhost');
-    const port = this.configService.get('MILVUS_PORT', '19530');
+    const host = this.configService.get("MILVUS_HOST", "localhost");
+    const port = this.configService.get("MILVUS_PORT", "19530");
 
     this.client = new MilvusClient({ address: `${host}:${port}` });
 
     // CRITICAL: Wait for connection
-    await this.client.connectPromise.catch(err => {
+    await this.client.connectPromise.catch((err) => {
       throw new Error(`Milvus connection failed: ${err.message}`);
     });
 
-    console.log('Milvus connection established');
+    console.log("Milvus connection established");
   }
 
   async initialize(): Promise<void> {
@@ -1181,36 +1224,36 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     // Create collection schema
     const schema = [
       {
-        name: 'id',
-        description: 'Document ID',
+        name: "id",
+        description: "Document ID",
         data_type: DataType.VarChar,
         is_primary_key: true,
         max_length: 255,
       },
       {
-        name: 'text',
-        description: 'Document text',
+        name: "text",
+        description: "Document text",
         data_type: DataType.VarChar,
         max_length: 65535,
       },
       {
-        name: 'embedding',
-        description: 'Vector embedding',
+        name: "embedding",
+        description: "Vector embedding",
         data_type: DataType.FloatVector,
         dim: dimensions,
       },
       {
-        name: 'source',
+        name: "source",
         data_type: DataType.VarChar,
         max_length: 255,
       },
       {
-        name: 'category',
+        name: "category",
         data_type: DataType.VarChar,
         max_length: 100,
       },
       {
-        name: 'word_count',
+        name: "word_count",
         data_type: DataType.Int32,
       },
     ];
@@ -1225,7 +1268,7 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
   async createVectorIndex(): Promise<void> {
     await this.client.createIndex({
       collection_name: this.currentCollection,
-      field_name: 'embedding',
+      field_name: "embedding",
       index_type: IndexType.HNSW,
       metric_type: MetricType.COSINE,
       params: {
@@ -1245,7 +1288,7 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     for (let i = 0; i < documents.length; i += batchSize) {
       const batch = documents.slice(i, i + batchSize);
 
-      const data = batch.map(doc => ({
+      const data = batch.map((doc) => ({
         id: doc.id,
         text: doc.text,
         embedding: doc.embedding,
@@ -1260,7 +1303,9 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
       });
 
       if ((i + batchSize) % 10000 === 0) {
-        console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+        console.log(
+          `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
+        );
       }
     }
   }
@@ -1269,23 +1314,23 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     const result = await this.client.search({
       collection_name: this.currentCollection,
       data: [query],
-      anns_field: 'embedding',
+      anns_field: "embedding",
       limit,
       params: { ef: 200 },
-      output_fields: ['id', 'text', 'source', 'category'],
+      output_fields: ["id", "text", "source", "category"],
     });
 
-    return result[0].map(item => ({
+    return result[0].map((item) => ({
       id: item.id as string,
       score: item.score || 0,
       document: {
         id: item.id as string,
-        text: item.text || '',
+        text: item.text || "",
         embedding: [],
         metadata: {
-          source: item.source || '',
-          category: item.category || '',
-          author: '',
+          source: item.source || "",
+          category: item.category || "",
+          author: "",
           created_at: new Date(),
           word_count: 0,
           tags: [],
@@ -1311,29 +1356,29 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
       filterExpressions.push(`word_count <= ${filter.word_count_max}`);
     }
 
-    const filterExpression = filterExpressions.join(' && ');
+    const filterExpression = filterExpressions.join(" && ");
 
     const result = await this.client.search({
       collection_name: this.currentCollection,
       data: [query],
-      anns_field: 'embedding',
+      anns_field: "embedding",
       limit,
       params: { ef: 200 },
       filter: filterExpression || undefined,
-      output_fields: ['id', 'text', 'source', 'category'],
+      output_fields: ["id", "text", "source", "category"],
     });
 
-    return result[0].map(item => ({
+    return result[0].map((item) => ({
       id: item.id as string,
       score: item.score || 0,
       document: {
         id: item.id as string,
-        text: item.text || '',
+        text: item.text || "",
         embedding: [],
         metadata: {
-          source: item.source || '',
-          category: item.category || '',
-          author: '',
+          source: item.source || "",
+          category: item.category || "",
+          author: "",
           created_at: new Date(),
           word_count: 0,
           tags: [],
@@ -1342,7 +1387,11 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     }));
   }
 
-  async hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]> {
+  async hybridSearch(
+    queryVector: number[],
+    queryText: string,
+    limit: number,
+  ): Promise<SearchResult[]> {
     // Simplified version - Milvus 2.5 supports BM25 but requires additional setup
     return this.vectorSearch(queryVector, limit);
   }
@@ -1357,7 +1406,7 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     });
 
     return {
-      vectorCount: parseInt(stats.data.row_count || '0'),
+      vectorCount: parseInt(stats.data.row_count || "0"),
       indexSize: 0,
       memoryUsage: 0,
     };
@@ -1385,10 +1434,15 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
 
 ```typescript
 // src/modules/vector-benchmarks/databases/qdrant/qdrant.service.ts
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { QdrantClient } from '@qdrant/js-client-rest';
-import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { QdrantClient } from "@qdrant/js-client-rest";
+import {
+  VectorDatabaseService,
+  BenchmarkDocument,
+  SearchResult,
+  DatabaseStats,
+} from "../../interfaces/benchmark-result.interface";
 
 @Injectable()
 export class QdrantService implements VectorDatabaseService, OnModuleInit {
@@ -1398,15 +1452,15 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const url = this.configService.get('QDRANT_URL', 'http://localhost:6333');
-    const apiKey = this.configService.get('QDRANT_API_KEY');
+    const url = this.configService.get("QDRANT_URL", "http://localhost:6333");
+    const apiKey = this.configService.get("QDRANT_API_KEY");
 
     this.client = new QdrantClient({
       url,
       apiKey,
     });
 
-    console.log('Qdrant connection established');
+    console.log("Qdrant connection established");
   }
 
   async initialize(): Promise<void> {
@@ -1427,7 +1481,7 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
     await this.client.createCollection(name, {
       vectors: {
         size: dimensions,
-        distance: 'Cosine',
+        distance: "Cosine",
         on_disk: false, // In-memory for best performance
       },
       optimizers_config: {
@@ -1444,18 +1498,18 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
 
     // Create payload indexes for filterable HNSW
     await this.client.createPayloadIndex(name, {
-      field_name: 'source',
-      field_schema: 'keyword',
+      field_name: "source",
+      field_schema: "keyword",
     });
 
     await this.client.createPayloadIndex(name, {
-      field_name: 'category',
-      field_schema: 'keyword',
+      field_name: "category",
+      field_schema: "keyword",
     });
 
     await this.client.createPayloadIndex(name, {
-      field_name: 'word_count',
-      field_schema: 'integer',
+      field_name: "word_count",
+      field_schema: "integer",
     });
   }
 
@@ -1465,7 +1519,7 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
     for (let i = 0; i < documents.length; i += batchSize) {
       const batch = documents.slice(i, i + batchSize);
 
-      const points = batch.map(doc => ({
+      const points = batch.map((doc) => ({
         id: doc.id,
         vector: doc.embedding,
         payload: {
@@ -1485,7 +1539,9 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
       });
 
       if ((i + batchSize) % 10000 === 0) {
-        console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+        console.log(
+          `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
+        );
       }
     }
   }
@@ -1498,17 +1554,17 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
       with_vector: false,
     });
 
-    return result.map(point => ({
+    return result.map((point) => ({
       id: point.id as string,
       score: point.score,
       document: {
         id: point.id as string,
-        text: (point.payload?.text as string) || '',
+        text: (point.payload?.text as string) || "",
         embedding: [],
         metadata: {
-          source: (point.payload?.source as string) || '',
-          category: (point.payload?.category as string) || '',
-          author: (point.payload?.author as string) || '',
+          source: (point.payload?.source as string) || "",
+          category: (point.payload?.category as string) || "",
+          author: (point.payload?.author as string) || "",
           created_at: new Date(point.payload?.created_at as string),
           word_count: (point.payload?.word_count as number) || 0,
           tags: (point.payload?.tags as string[]) || [],
@@ -1522,16 +1578,16 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
     const must: any[] = [];
 
     if (filter.source) {
-      must.push({ key: 'source', match: { value: filter.source } });
+      must.push({ key: "source", match: { value: filter.source } });
     }
     if (filter.category) {
-      must.push({ key: 'category', match: { value: filter.category } });
+      must.push({ key: "category", match: { value: filter.category } });
     }
     if (filter.word_count_min) {
-      must.push({ key: 'word_count', range: { gte: filter.word_count_min } });
+      must.push({ key: "word_count", range: { gte: filter.word_count_min } });
     }
     if (filter.word_count_max) {
-      must.push({ key: 'word_count', range: { lte: filter.word_count_max } });
+      must.push({ key: "word_count", range: { lte: filter.word_count_max } });
     }
 
     const qdrantFilter = must.length > 0 ? { must } : undefined;
@@ -1544,17 +1600,17 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
       with_vector: false,
     });
 
-    return result.map(point => ({
+    return result.map((point) => ({
       id: point.id as string,
       score: point.score,
       document: {
         id: point.id as string,
-        text: (point.payload?.text as string) || '',
+        text: (point.payload?.text as string) || "",
         embedding: [],
         metadata: {
-          source: (point.payload?.source as string) || '',
-          category: (point.payload?.category as string) || '',
-          author: (point.payload?.author as string) || '',
+          source: (point.payload?.source as string) || "",
+          category: (point.payload?.category as string) || "",
+          author: (point.payload?.author as string) || "",
           created_at: new Date(point.payload?.created_at as string),
           word_count: (point.payload?.word_count as number) || 0,
           tags: (point.payload?.tags as string[]) || [],
@@ -1563,7 +1619,11 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
     }));
   }
 
-  async hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]> {
+  async hybridSearch(
+    queryVector: number[],
+    queryText: string,
+    limit: number,
+  ): Promise<SearchResult[]> {
     // Simplified - full hybrid search would require sparse vectors
     return this.vectorSearch(queryVector, limit);
   }
@@ -1604,10 +1664,15 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
 
 ```typescript
 // src/modules/vector-benchmarks/databases/lancedb/lancedb.service.ts
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as lancedb from '@lancedb/lancedb';
-import { VectorDatabaseService, BenchmarkDocument, SearchResult, DatabaseStats } from '../../interfaces/benchmark-result.interface';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as lancedb from "@lancedb/lancedb";
+import {
+  VectorDatabaseService,
+  BenchmarkDocument,
+  SearchResult,
+  DatabaseStats,
+} from "../../interfaces/benchmark-result.interface";
 
 @Injectable()
 export class LanceDbService implements VectorDatabaseService, OnModuleInit {
@@ -1617,9 +1682,9 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const uri = this.configService.get('LANCEDB_URI', './data/lancedb');
+    const uri = this.configService.get("LANCEDB_URI", "./data/lancedb");
     this.db = await lancedb.connect(uri);
-    console.log('LanceDB connection established');
+    console.log("LanceDB connection established");
   }
 
   async initialize(): Promise<void> {
@@ -1638,11 +1703,11 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
 
     // Create table with first document (LanceDB infers schema)
     const dummyDoc = {
-      id: 'dummy',
-      text: 'dummy',
+      id: "dummy",
+      text: "dummy",
       embedding: new Array(dimensions).fill(0),
-      source: '',
-      category: '',
+      source: "",
+      category: "",
       word_count: 0,
     };
 
@@ -1652,11 +1717,11 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
     await table.delete('id = "dummy"');
 
     // Create vector index
-    await table.createIndex('embedding', {
-      type: 'IVF_PQ',
+    await table.createIndex("embedding", {
+      type: "IVF_PQ",
       num_partitions: 256,
       num_sub_vectors: 96,
-      metric: 'cosine',
+      metric: "cosine",
     });
   }
 
@@ -1667,7 +1732,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
     for (let i = 0; i < documents.length; i += batchSize) {
       const batch = documents.slice(i, i + batchSize);
 
-      const data = batch.map(doc => ({
+      const data = batch.map((doc) => ({
         id: doc.id,
         text: doc.text,
         embedding: doc.embedding,
@@ -1679,7 +1744,9 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
       await table.add(data);
 
       if ((i + batchSize) % 10000 === 0) {
-        console.log(`Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`);
+        console.log(
+          `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
+        );
       }
     }
   }
@@ -1687,12 +1754,9 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
   async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
     const table = await this.db.openTable(this.currentTable);
 
-    const results = await table
-      .vectorSearch(query)
-      .limit(limit)
-      .toArray();
+    const results = await table.vectorSearch(query).limit(limit).toArray();
 
-    return results.map(result => ({
+    return results.map((result) => ({
       id: result.id,
       score: 1 - (result._distance || 0), // Convert distance to similarity
       document: {
@@ -1702,7 +1766,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
         metadata: {
           source: result.source,
           category: result.category,
-          author: '',
+          author: "",
           created_at: new Date(),
           word_count: result.word_count,
           tags: [],
@@ -1730,7 +1794,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
       whereClauses.push(`word_count <= ${filter.word_count_max}`);
     }
 
-    const whereClause = whereClauses.join(' AND ');
+    const whereClause = whereClauses.join(" AND ");
 
     let search = table.vectorSearch(query).limit(limit);
 
@@ -1740,7 +1804,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
 
     const results = await search.toArray();
 
-    return results.map(result => ({
+    return results.map((result) => ({
       id: result.id,
       score: 1 - (result._distance || 0),
       document: {
@@ -1750,7 +1814,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
         metadata: {
           source: result.source,
           category: result.category,
-          author: '',
+          author: "",
           created_at: new Date(),
           word_count: result.word_count,
           tags: [],
@@ -1759,7 +1823,11 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
     }));
   }
 
-  async hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]> {
+  async hybridSearch(
+    queryVector: number[],
+    queryText: string,
+    limit: number,
+  ): Promise<SearchResult[]> {
     // Simplified - full hybrid search would use LanceDB's FTS
     return this.vectorSearch(queryVector, limit);
   }
@@ -1789,18 +1857,22 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
 
 ```typescript
 // src/modules/vector-benchmarks/vector-benchmarks.service.ts
-import { Injectable } from '@nestjs/common';
-import { PgVectorService } from './databases/pgvector/pgvector.service';
-import { ChromaDbService } from './databases/chromadb/chromadb.service';
-import { MilvusService } from './databases/milvus/milvus.service';
-import { QdrantService } from './databases/qdrant/qdrant.service';
-import { LanceDbService } from './databases/lancedb/lancedb.service';
-import { LatencyBenchmark } from './benchmarks/latency.benchmark';
-import { DatasetLoaderService } from './data-generators/dataset-loader.service';
-import { JsonReporterService } from './reporters/json-reporter.service';
-import { MarkdownReporterService } from './reporters/markdown-reporter.service';
-import { BenchmarkConfig, BenchmarkResult, VectorDatabaseService } from './interfaces/benchmark-result.interface';
-import { DatabaseType, BenchmarkType } from './vector-benchmarks.enums';
+import { Injectable } from "@nestjs/common";
+import { PgVectorService } from "./databases/pgvector/pgvector.service";
+import { ChromaDbService } from "./databases/chromadb/chromadb.service";
+import { MilvusService } from "./databases/milvus/milvus.service";
+import { QdrantService } from "./databases/qdrant/qdrant.service";
+import { LanceDbService } from "./databases/lancedb/lancedb.service";
+import { LatencyBenchmark } from "./benchmarks/latency.benchmark";
+import { DatasetLoaderService } from "./data-generators/dataset-loader.service";
+import { JsonReporterService } from "./reporters/json-reporter.service";
+import { MarkdownReporterService } from "./reporters/markdown-reporter.service";
+import {
+  BenchmarkConfig,
+  BenchmarkResult,
+  VectorDatabaseService,
+} from "./interfaces/benchmark-result.interface";
+import { DatabaseType, BenchmarkType } from "./vector-benchmarks.enums";
 
 @Injectable()
 export class VectorBenchmarksService {
@@ -1827,24 +1899,20 @@ export class VectorBenchmarksService {
     );
 
     // Setup collection
-    console.log('Creating collection...');
+    console.log("Creating collection...");
     await service.initialize();
     await service.createCollection(`benchmark_${Date.now()}`, config.dimensions);
 
     // Insert data
-    console.log('Inserting vectors...');
+    console.log("Inserting vectors...");
     await service.insertVectors(documents);
 
     // Generate queries
-    const queryVectors = documents.slice(0, 1000).map(doc => doc.embedding);
+    const queryVectors = documents.slice(0, 1000).map((doc) => doc.embedding);
 
     // Run benchmark
     console.log(`Running ${config.queryType} benchmark...`);
-    const result = await this.latencyBenchmark.runBenchmark(
-      service,
-      queryVectors,
-      config,
-    );
+    const result = await this.latencyBenchmark.runBenchmark(service, queryVectors, config);
 
     return result;
   }
@@ -1869,7 +1937,7 @@ export class VectorBenchmarksService {
         dimensions: 1536,
         concurrency: 10,
         duration: 60,
-        queryType: 'similarity',
+        queryType: "similarity",
         topK: 10,
         recallTarget: 0.99,
       };
@@ -1912,20 +1980,20 @@ export class VectorBenchmarksService {
 
 ```typescript
 // src/modules/vector-benchmarks/vector-benchmarks.controller.ts
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
-import { VectorBenchmarksService } from './vector-benchmarks.service';
-import { BenchmarkConfig } from './interfaces/benchmark-result.interface';
+import { Controller, Post, Body, Get, Param } from "@nestjs/common";
+import { VectorBenchmarksService } from "./vector-benchmarks.service";
+import { BenchmarkConfig } from "./interfaces/benchmark-result.interface";
 
-@Controller('benchmarks')
+@Controller("benchmarks")
 export class VectorBenchmarksController {
   constructor(private benchmarksService: VectorBenchmarksService) {}
 
-  @Post('run')
+  @Post("run")
   async runBenchmark(@Body() config: BenchmarkConfig) {
     return this.benchmarksService.runBenchmark(config);
   }
 
-  @Post('run-all')
+  @Post("run-all")
   async runAllBenchmarks(@Body() body: { vectorCount?: number }) {
     return this.benchmarksService.runAllBenchmarks(body.vectorCount);
   }
@@ -1937,6 +2005,7 @@ export class VectorBenchmarksController {
 ## Implementation Checklist
 
 ### Phase 1: Infrastructure
+
 - [ ] Create module structure
 - [ ] Define TypeScript interfaces
 - [ ] Implement base benchmark class
@@ -1946,6 +2015,7 @@ export class VectorBenchmarksController {
 - [ ] Create Docker Compose for databases
 
 ### Phase 2: PGVector
+
 - [ ] Install dependencies
 - [ ] Implement PgVectorService
 - [ ] Add HNSW/IVFFlat indexing
@@ -1954,6 +2024,7 @@ export class VectorBenchmarksController {
 - [ ] Write unit tests
 
 ### Phase 3: ChromaDB
+
 - [ ] Install dependencies
 - [ ] Implement ChromaDbService
 - [ ] Implement vector search
@@ -1961,6 +2032,7 @@ export class VectorBenchmarksController {
 - [ ] Write unit tests
 
 ### Phase 4: Milvus
+
 - [ ] Install dependencies
 - [ ] Implement MilvusService
 - [ ] Configure collection schema
@@ -1968,6 +2040,7 @@ export class VectorBenchmarksController {
 - [ ] Write unit tests
 
 ### Phase 5: Qdrant
+
 - [ ] Install dependencies
 - [ ] Implement QdrantService
 - [ ] Configure filterable HNSW
@@ -1975,6 +2048,7 @@ export class VectorBenchmarksController {
 - [ ] Write unit tests
 
 ### Phase 6: LanceDB
+
 - [ ] Install dependencies
 - [ ] Implement LanceDbService
 - [ ] Configure IVF-PQ indexes
@@ -1982,6 +2056,7 @@ export class VectorBenchmarksController {
 - [ ] Write unit tests
 
 ### Phase 7: Integration
+
 - [ ] Implement orchestration service
 - [ ] Create REST API
 - [ ] Add benchmark types
