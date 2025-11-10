@@ -54,13 +54,32 @@ export interface DatabaseStats {
   memoryUsage: number;
 }
 
+export interface MetadataFilter {
+  source?: string;
+  category?: string;
+  author?: string;
+  word_count_min?: number;
+  word_count_max?: number;
+  tags?: string[];
+  created_after?: Date;
+  created_before?: Date;
+}
+
 export interface VectorDatabaseService {
   initialize(): Promise<void>;
   createCollection(name: string, dimensions: number): Promise<void>;
   insertVectors(documents: BenchmarkDocument[]): Promise<void>;
   vectorSearch(query: number[], limit: number): Promise<SearchResult[]>;
-  filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]>;
-  hybridSearch(queryVector: number[], queryText: string, limit: number): Promise<SearchResult[]>;
+  filteredSearch(
+    query: number[],
+    filter: MetadataFilter,
+    limit: number,
+  ): Promise<SearchResult[]>;
+  hybridSearch(
+    queryVector: number[],
+    queryText: string,
+    limit: number,
+  ): Promise<SearchResult[]>;
   deleteCollection(name: string): Promise<void>;
   getStats(): Promise<DatabaseStats>;
 }

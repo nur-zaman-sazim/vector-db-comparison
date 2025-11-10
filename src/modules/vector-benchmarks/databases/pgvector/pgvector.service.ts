@@ -7,6 +7,7 @@ import {
   BenchmarkDocument,
   SearchResult,
   DatabaseStats,
+  MetadataFilter,
 } from '../../interfaces/benchmark-result.interface';
 
 @Injectable()
@@ -20,17 +21,16 @@ export class PgVectorService
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
+    // Use existing DATABASE_URL from the application
+    const databaseUrl = this.configService.get<string>('DATABASE_URL');
+
     this.pool = new Pool({
-      host: this.configService.get('PGVECTOR_HOST', 'localhost'),
-      port: this.configService.get('PGVECTOR_PORT', 5433),
-      database: this.configService.get('PGVECTOR_DATABASE', 'benchmark_db'),
-      user: this.configService.get('PGVECTOR_USER', 'benchmark_user'),
-      password: this.configService.get('PGVECTOR_PASSWORD', 'benchmark_pass'),
+      connectionString: databaseUrl,
       max: 20,
     });
 
     await pgvector.registerType(this.pool);
-    this.logger.log('PGVector connection established');
+    this.logger.log('PGVector connection established using DATABASE_URL');
   }
 
   async onModuleDestroy() {
@@ -174,7 +174,7 @@ export class PgVectorService
 
   async filteredSearch(
     query: number[],
-    filter: any,
+    filter: MetadataFilter,
     limit: number,
   ): Promise<SearchResult[]> {
     const client = await this.pool.connect();
@@ -184,7 +184,7 @@ export class PgVectorService
 
       // Build WHERE clause from filter
       const whereClauses: string[] = [];
-      const params: any[] = [pgvector.toSql(query)];
+      const params: (string | number | Date)[] = [pgvector.toSql(query)];
       let paramIndex = 2;
 
       if (filter.source) {
@@ -199,15 +199,27 @@ export class PgVectorService
         paramIndex++;
       }
 
-      if (filter.word_count_min) {
+      if (filter.word_count_min !== undefined) {
         whereClauses.push(`word_count >= $${paramIndex}`);
         params.push(filter.word_count_min);
         paramIndex++;
       }
 
-      if (filter.word_count_max) {
+      if (filter.word_count_max !== undefined) {
         whereClauses.push(`word_count <= $${paramIndex}`);
         params.push(filter.word_count_max);
+        paramIndex++;
+      }
+
+      if (filter.created_after) {
+        whereClauses.push(`created_at >= $${paramIndex}`);
+        params.push(filter.created_after);
+        paramIndex++;
+      }
+
+      if (filter.created_before) {
+        whereClauses.push(`created_at <= $${paramIndex}`);
+        params.push(filter.created_before);
         paramIndex++;
       }
 
