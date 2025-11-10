@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@mikro-orm/nestjs';
 import { LatencyBenchmark } from './benchmarks/latency.benchmark';
 import { DatasetLoaderService } from './data-generators/dataset-loader.service';
 import { JsonReporterService } from './reporters/json-reporter.service';
@@ -6,10 +7,12 @@ import { MarkdownReporterService } from './reporters/markdown-reporter.service';
 import { ConsoleReporterService } from './reporters/console-reporter.service';
 import {
   BenchmarkConfig,
-  BenchmarkResult,
+  BenchmarkResult as BenchmarkResultInterface,
   VectorDatabaseService,
 } from './interfaces/benchmark-result.interface';
-import { DatabaseType } from './vector-benchmarks.enums';
+import { DatabaseType, BenchmarkType } from './vector-benchmarks.enums';
+import { BenchmarkResult } from '../../common/entities/benchmark-results.entity';
+import { BenchmarkResultsRepository } from './benchmark-results.repository';
 
 @Injectable()
 export class VectorBenchmarksService {
@@ -17,6 +20,8 @@ export class VectorBenchmarksService {
   private databaseServices: Map<DatabaseType, VectorDatabaseService> = new Map();
 
   constructor(
+    @InjectRepository(BenchmarkResult)
+    private benchmarkResultsRepo: BenchmarkResultsRepository,
     private latencyBenchmark: LatencyBenchmark,
     private datasetLoader: DatasetLoaderService,
     private jsonReporter: JsonReporterService,
@@ -32,7 +37,10 @@ export class VectorBenchmarksService {
     this.logger.log(`Registered database service: ${type}`);
   }
 
-  async runBenchmark(config: BenchmarkConfig): Promise<BenchmarkResult> {
+  async runBenchmark(
+    config: BenchmarkConfig,
+    persistToDb: boolean = true,
+  ): Promise<BenchmarkResultInterface> {
     const service = this.databaseServices.get(config.database as DatabaseType);
 
     if (!service) {
@@ -74,6 +82,11 @@ export class VectorBenchmarksService {
     // Print results
     this.consoleReporter.printResult(result);
 
+    // Persist to database
+    if (persistToDb) {
+      await this.saveBenchmarkResult(result);
+    }
+
     // Cleanup
     try {
       await service.deleteCollection(collectionName);
@@ -85,11 +98,32 @@ export class VectorBenchmarksService {
     return result;
   }
 
+  private async saveBenchmarkResult(
+    result: BenchmarkResultInterface,
+  ): Promise<void> {
+    try {
+      const entity = this.benchmarkResultsRepo.create({
+        databaseType: result.database as DatabaseType,
+        benchmarkType: BenchmarkType.LATENCY, // Will be dynamic when we add more benchmarks
+        testName: result.testName,
+        testTimestamp: result.timestamp,
+        config: result.config,
+        metrics: result.metrics,
+        environmentInfo: `Node ${process.version}, Platform: ${process.platform}`,
+      });
+
+      await this.benchmarkResultsRepo.persistAndFlush(entity);
+      this.logger.log(`Benchmark result saved to database (ID: ${entity.id})`);
+    } catch (error) {
+      this.logger.error(`Failed to save benchmark result: ${error.message}`);
+    }
+  }
+
   async runAllBenchmarks(
     vectorCount: number = 100000,
-  ): Promise<BenchmarkResult[]> {
+  ): Promise<BenchmarkResultInterface[]> {
     const databases = Array.from(this.databaseServices.keys());
-    const results: BenchmarkResult[] = [];
+    const results: BenchmarkResultInterface[] = [];
 
     for (const database of databases) {
       this.logger.log(`\n=== Benchmarking ${database} ===\n`);
