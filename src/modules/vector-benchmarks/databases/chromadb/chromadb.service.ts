@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChromaClient, Collection, Metadata, Where } from 'chromadb';
 import {
@@ -19,6 +19,7 @@ interface ChromaMetadata extends Metadata {
 
 @Injectable()
 export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
+  private readonly logger = new Logger(ChromaDbService.name);
   private client!: ChromaClient;
   private collection!: Collection;
 
@@ -27,11 +28,12 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
   async onModuleInit() {
     const url = this.configService.get('CHROMADB_URL', 'http://localhost:8000');
     this.client = new ChromaClient({ path: url });
-    console.log('ChromaDB connection established');
+    this.logger.log('ChromaDB connection established');
   }
 
   async initialize(): Promise<void> {
     // ChromaDB doesn't require initialization
+    this.logger.log('ChromaDB service initialized');
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -50,6 +52,8 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
         'hnsw:M': 16,
       },
     });
+
+    this.logger.log(`Collection "${name}" created with ${dimensions} dimensions`);
   }
 
   async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
@@ -75,11 +79,13 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
       });
 
       if ((i + batchSize) % 10000 === 0) {
-        console.log(
+        this.logger.log(
           `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
         );
       }
     }
+
+    this.logger.log(`Inserted ${documents.length} vectors successfully`);
   }
 
   async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
@@ -155,6 +161,7 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
 
   async deleteCollection(name: string): Promise<void> {
     await this.client.deleteCollection({ name });
+    this.logger.log(`Collection "${name}" deleted`);
   }
 
   async getStats(): Promise<DatabaseStats> {

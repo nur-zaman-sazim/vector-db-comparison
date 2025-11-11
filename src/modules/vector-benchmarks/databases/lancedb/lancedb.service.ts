@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as lancedb from '@lancedb/lancedb';
 import {
@@ -6,10 +6,12 @@ import {
   BenchmarkDocument,
   SearchResult,
   DatabaseStats,
+  MetadataFilter,
 } from '../../interfaces/benchmark-result.interface';
 
 @Injectable()
 export class LanceDbService implements VectorDatabaseService, OnModuleInit {
+  private readonly logger = new Logger(LanceDbService.name);
   private db!: lancedb.Connection;
   private currentTable!: string;
 
@@ -18,11 +20,12 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
   async onModuleInit() {
     const uri = this.configService.get('LANCEDB_URI', './data/lancedb');
     this.db = await lancedb.connect(uri);
-    console.log('LanceDB connection established');
+    this.logger.log('LanceDB connection established');
   }
 
   async initialize(): Promise<void> {
     // LanceDB doesn't require initialization
+    this.logger.log('LanceDB service initialized');
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -52,6 +55,8 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
 
     // Create vector index
     // LanceDB will automatically create an appropriate index for the vector column
+
+    this.logger.log(`Collection "${name}" created with ${dimensions} dimensions`);
   }
 
   async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
@@ -73,11 +78,13 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
       await table.add(data);
 
       if ((i + batchSize) % 10000 === 0) {
-        console.log(
+        this.logger.log(
           `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
         );
       }
     }
+
+    this.logger.log(`Inserted ${documents.length} vectors successfully`);
   }
 
   async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
@@ -104,7 +111,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
     }));
   }
 
-  async filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]> {
+  async filteredSearch(query: number[], filter: MetadataFilter, limit: number): Promise<SearchResult[]> {
     const table = await this.db.openTable(this.currentTable);
 
     // Build SQL-like where clause
@@ -116,10 +123,10 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
     if (filter.category) {
       whereClauses.push(`category = '${filter.category}'`);
     }
-    if (filter.word_count_min) {
+    if (filter.word_count_min !== undefined) {
       whereClauses.push(`word_count >= ${filter.word_count_min}`);
     }
-    if (filter.word_count_max) {
+    if (filter.word_count_max !== undefined) {
       whereClauses.push(`word_count <= ${filter.word_count_max}`);
     }
 
