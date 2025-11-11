@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MilvusClient, DataType, IndexType, MetricType } from '@zilliz/milvus2-sdk-node';
 import {
@@ -6,6 +6,7 @@ import {
   BenchmarkDocument,
   SearchResult,
   DatabaseStats,
+  MetadataFilter,
 } from '../../interfaces/benchmark-result.interface';
 
 interface MilvusSearchResultItem {
@@ -19,6 +20,7 @@ interface MilvusSearchResultItem {
 
 @Injectable()
 export class MilvusService implements VectorDatabaseService, OnModuleInit {
+  private readonly logger = new Logger(MilvusService.name);
   private client!: MilvusClient;
   private currentCollection!: string;
   private dimensions!: number;
@@ -33,14 +35,16 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
 
     // CRITICAL: Wait for connection
     await this.client.connectPromise.catch((err) => {
+      this.logger.error(`Milvus connection failed: ${err.message}`);
       throw new Error(`Milvus connection failed: ${err.message}`);
     });
 
-    console.log('Milvus connection established');
+    this.logger.log('Milvus connection established');
   }
 
   async initialize(): Promise<void> {
     // Milvus doesn't require initialization
+    this.logger.log('Milvus service initialized');
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -96,6 +100,8 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
       schema,
       enable_dynamic_field: true,
     });
+
+    this.logger.log(`Collection "${name}" created with ${dimensions} dimensions`);
   }
 
   async createVectorIndex(): Promise<void> {
@@ -113,6 +119,8 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     await this.client.loadCollection({
       collection_name: this.currentCollection,
     });
+
+    this.logger.log('HNSW index created and collection loaded');
   }
 
   async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
@@ -136,11 +144,13 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
       });
 
       if ((i + batchSize) % 10000 === 0) {
-        console.log(
+        this.logger.log(
           `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
         );
       }
     }
+
+    this.logger.log(`Inserted ${documents.length} vectors successfully`);
   }
 
   async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
@@ -174,7 +184,7 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     }));
   }
 
-  async filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]> {
+  async filteredSearch(query: number[], filter: MetadataFilter, limit: number): Promise<SearchResult[]> {
     // Build filter expression
     const filterExpressions: string[] = [];
 
@@ -184,10 +194,10 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     if (filter.category) {
       filterExpressions.push(`category == "${filter.category}"`);
     }
-    if (filter.word_count_min) {
+    if (filter.word_count_min !== undefined) {
       filterExpressions.push(`word_count >= ${filter.word_count_min}`);
     }
-    if (filter.word_count_max) {
+    if (filter.word_count_max !== undefined) {
       filterExpressions.push(`word_count <= ${filter.word_count_max}`);
     }
 
@@ -235,6 +245,7 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
 
   async deleteCollection(name: string): Promise<void> {
     await this.client.dropCollection({ collection_name: name });
+    this.logger.log(`Collection "${name}" deleted`);
   }
 
   async getStats(): Promise<DatabaseStats> {

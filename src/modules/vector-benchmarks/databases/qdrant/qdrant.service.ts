@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import {
@@ -6,10 +6,18 @@ import {
   BenchmarkDocument,
   SearchResult,
   DatabaseStats,
+  MetadataFilter,
 } from '../../interfaces/benchmark-result.interface';
+
+interface QdrantFilter {
+  key: string;
+  match?: { value: string };
+  range?: { gte?: number; lte?: number };
+}
 
 @Injectable()
 export class QdrantService implements VectorDatabaseService, OnModuleInit {
+  private readonly logger = new Logger(QdrantService.name);
   private client!: QdrantClient;
   private currentCollection!: string;
 
@@ -24,11 +32,12 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
       apiKey,
     });
 
-    console.log('Qdrant connection established');
+    this.logger.log('Qdrant connection established');
   }
 
   async initialize(): Promise<void> {
     // Qdrant doesn't require initialization
+    this.logger.log('Qdrant service initialized');
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -75,6 +84,8 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
       field_name: 'word_count',
       field_schema: 'integer',
     });
+
+    this.logger.log(`Collection "${name}" created with ${dimensions} dimensions and payload indexes`);
   }
 
   async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
@@ -103,11 +114,13 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
       });
 
       if ((i + batchSize) % 10000 === 0) {
-        console.log(
+        this.logger.log(
           `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
         );
       }
     }
+
+    this.logger.log(`Inserted ${documents.length} vectors successfully`);
   }
 
   async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
@@ -137,9 +150,9 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
     }));
   }
 
-  async filteredSearch(query: number[], filter: any, limit: number): Promise<SearchResult[]> {
+  async filteredSearch(query: number[], filter: MetadataFilter, limit: number): Promise<SearchResult[]> {
     // Build Qdrant filter
-    const must: any[] = [];
+    const must: QdrantFilter[] = [];
 
     if (filter.source) {
       must.push({ key: 'source', match: { value: filter.source } });
@@ -147,10 +160,10 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
     if (filter.category) {
       must.push({ key: 'category', match: { value: filter.category } });
     }
-    if (filter.word_count_min) {
+    if (filter.word_count_min !== undefined) {
       must.push({ key: 'word_count', range: { gte: filter.word_count_min } });
     }
-    if (filter.word_count_max) {
+    if (filter.word_count_max !== undefined) {
       must.push({ key: 'word_count', range: { lte: filter.word_count_max } });
     }
 
@@ -194,6 +207,7 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
 
   async deleteCollection(name: string): Promise<void> {
     await this.client.deleteCollection(name);
+    this.logger.log(`Collection "${name}" deleted`);
   }
 
   async getStats(): Promise<DatabaseStats> {
