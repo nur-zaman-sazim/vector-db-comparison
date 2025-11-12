@@ -170,6 +170,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
 
   async deleteCollection(name: string): Promise<void> {
     await this.db.dropTable(name);
+    this.logger.log(`Collection "${name}" deleted`);
   }
 
   async getStats(): Promise<DatabaseStats> {
