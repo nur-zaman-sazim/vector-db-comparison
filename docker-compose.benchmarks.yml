@@ -2,27 +2,27 @@ version: "3.8"
 
 services:
   # PGVector
-  pgvector:
-    image: pgvector/pgvector:pg16
-    container_name: benchmark_pgvector
-    environment:
-      POSTGRES_DB: benchmark_db
-      POSTGRES_USER: benchmark_user
-      POSTGRES_PASSWORD: benchmark_pass
-    ports:
-      - "5433:5432"
-    volumes:
-      - pgvector_data:/var/lib/postgresql/data
-    command:
-      - postgres
-      - -c
-      - shared_buffers=2GB
-      - -c
-      - effective_cache_size=6GB
-      - -c
-      - maintenance_work_mem=1GB
-      - -c
-      - max_parallel_maintenance_workers=4
+  # pgvector:
+  #   image: pgvector/pgvector:pg16
+  #   container_name: benchmark_pgvector
+  #   environment:
+  #     POSTGRES_DB: benchmark_db
+  #     POSTGRES_USER: benchmark_user
+  #     POSTGRES_PASSWORD: benchmark_pass
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - pgvector_data:/var/lib/postgresql/data
+  #   command:
+  #     - postgres
+  #     - -c
+  #     - shared_buffers=2GB
+  #     - -c
+  #     - effective_cache_size=6GB
+  #     - -c
+  #     - maintenance_work_mem=1GB
+  #     - -c
+  #     - max_parallel_maintenance_workers=4
 
   # ChromaDB
   chromadb:

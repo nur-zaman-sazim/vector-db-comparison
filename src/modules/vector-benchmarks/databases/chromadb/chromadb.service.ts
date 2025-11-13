@@ -1,12 +1,14 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { ChromaClient, Collection, Metadata, Where } from 'chromadb';
+import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+
+import { ChromaClient, Collection, Metadata, Where } from "chromadb";
+
 import {
   VectorDatabaseService,
   BenchmarkDocument,
   SearchResult,
   DatabaseStats,
-} from '../../interfaces/benchmark-result.interface';
+} from "../../interfaces/benchmark-result.interface";
 
 interface ChromaMetadata extends Metadata {
   source: string;
@@ -14,7 +16,7 @@ interface ChromaMetadata extends Metadata {
   author: string;
   created_at: string;
   word_count: number;
-  tags: string;  // Store as JSON string since ChromaDB doesn't support arrays in metadata
+  tags: string; // Store as JSON string since ChromaDB doesn't support arrays in metadata
 }
 
 @Injectable()
@@ -26,14 +28,14 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const url = this.configService.get('CHROMADB_URL', 'http://localhost:8000');
+    const url = this.configService.get("CHROMADB_URL", "http://localhost:8000");
     this.client = new ChromaClient({ path: url });
-    this.logger.log('ChromaDB connection established');
+    this.logger.log("ChromaDB connection established");
   }
 
   async initialize(): Promise<void> {
     // ChromaDB doesn't require initialization
-    this.logger.log('ChromaDB service initialized');
+    this.logger.log("ChromaDB service initialized");
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -46,10 +48,10 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
     this.collection = await this.client.createCollection({
       name,
       metadata: {
-        'hnsw:space': 'cosine',
-        'hnsw:construction_ef': 100,
-        'hnsw:search_ef': 100,
-        'hnsw:M': 16,
+        "hnsw:space": "cosine",
+        "hnsw:construction_ef": 100,
+        "hnsw:search_ef": 100,
+        "hnsw:M": 16,
       },
     });
 
@@ -68,7 +70,7 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
         author: doc.metadata.author,
         created_at: doc.metadata.created_at.toISOString(),
         word_count: doc.metadata.word_count,
-        tags: JSON.stringify(doc.metadata.tags),  // Serialize array to string
+        tags: JSON.stringify(doc.metadata.tags), // Serialize array to string
       }));
 
       await this.collection.add({
@@ -96,19 +98,21 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
 
     return result.ids[0].map((id, idx) => {
       const chromaMetadata = (result.metadatas?.[0]?.[idx] as unknown as ChromaMetadata) || {};
-      const tags = chromaMetadata.tags ? JSON.parse(chromaMetadata.tags as string) as string[] : [];
+      const tags = chromaMetadata.tags
+        ? (JSON.parse(chromaMetadata.tags as string) as string[])
+        : [];
 
       return {
         id: id as string,
         score: 1 - (result.distances?.[0]?.[idx] || 0),
         document: {
           id: id as string,
-          text: (result.documents?.[0]?.[idx] as string) || '',
+          text: (result.documents?.[0]?.[idx] as string) || "",
           embedding: [],
           metadata: {
-            source: chromaMetadata.source || '',
-            category: chromaMetadata.category || '',
-            author: chromaMetadata.author || '',
+            source: chromaMetadata.source || "",
+            category: chromaMetadata.category || "",
+            author: chromaMetadata.author || "",
             created_at: new Date(chromaMetadata.created_at || new Date().toISOString()),
             word_count: chromaMetadata.word_count || 0,
             tags,
@@ -118,7 +122,11 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
     });
   }
 
-  async filteredSearch(query: number[], filter: Record<string, unknown>, limit: number): Promise<SearchResult[]> {
+  async filteredSearch(
+    query: number[],
+    filter: Record<string, unknown>,
+    limit: number,
+  ): Promise<SearchResult[]> {
     const result = await this.collection.query({
       queryEmbeddings: [query],
       nResults: limit,
@@ -127,19 +135,21 @@ export class ChromaDbService implements VectorDatabaseService, OnModuleInit {
 
     return result.ids[0].map((id, idx) => {
       const chromaMetadata = (result.metadatas?.[0]?.[idx] as unknown as ChromaMetadata) || {};
-      const tags = chromaMetadata.tags ? JSON.parse(chromaMetadata.tags as string) as string[] : [];
+      const tags = chromaMetadata.tags
+        ? (JSON.parse(chromaMetadata.tags as string) as string[])
+        : [];
 
       return {
         id: id as string,
         score: 1 - (result.distances?.[0]?.[idx] || 0),
         document: {
           id: id as string,
-          text: (result.documents?.[0]?.[idx] as string) || '',
+          text: (result.documents?.[0]?.[idx] as string) || "",
           embedding: [],
           metadata: {
-            source: chromaMetadata.source || '',
-            category: chromaMetadata.category || '',
-            author: chromaMetadata.author || '',
+            source: chromaMetadata.source || "",
+            category: chromaMetadata.category || "",
+            author: chromaMetadata.author || "",
             created_at: new Date(chromaMetadata.created_at || new Date().toISOString()),
             word_count: chromaMetadata.word_count || 0,
             tags,

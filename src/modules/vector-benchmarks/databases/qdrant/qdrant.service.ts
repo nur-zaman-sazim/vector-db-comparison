@@ -1,13 +1,15 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { QdrantClient } from '@qdrant/js-client-rest';
+import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+
+import { QdrantClient } from "@qdrant/js-client-rest";
+
 import {
   VectorDatabaseService,
   BenchmarkDocument,
   SearchResult,
   DatabaseStats,
   MetadataFilter,
-} from '../../interfaces/benchmark-result.interface';
+} from "../../interfaces/benchmark-result.interface";
 
 interface QdrantFilter {
   key: string;
@@ -24,20 +26,20 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const url = this.configService.get('QDRANT_URL', 'http://localhost:6333');
-    const apiKey = this.configService.get('QDRANT_API_KEY');
+    const url = this.configService.get("QDRANT_URL", "http://localhost:6333");
+    const apiKey = this.configService.get("QDRANT_API_KEY");
 
     this.client = new QdrantClient({
       url,
       apiKey,
     });
 
-    this.logger.log('Qdrant connection established');
+    this.logger.log("Qdrant connection established");
   }
 
   async initialize(): Promise<void> {
     // Qdrant doesn't require initialization
-    this.logger.log('Qdrant service initialized');
+    this.logger.log("Qdrant service initialized");
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -54,7 +56,7 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
     await this.client.createCollection(name, {
       vectors: {
         size: dimensions,
-        distance: 'Cosine',
+        distance: "Cosine",
         on_disk: false, // In-memory for best performance
       },
       optimizers_config: {
@@ -71,21 +73,23 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
 
     // Create payload indexes for filterable HNSW
     await this.client.createPayloadIndex(name, {
-      field_name: 'source',
-      field_schema: 'keyword',
+      field_name: "source",
+      field_schema: "keyword",
     });
 
     await this.client.createPayloadIndex(name, {
-      field_name: 'category',
-      field_schema: 'keyword',
+      field_name: "category",
+      field_schema: "keyword",
     });
 
     await this.client.createPayloadIndex(name, {
-      field_name: 'word_count',
-      field_schema: 'integer',
+      field_name: "word_count",
+      field_schema: "integer",
     });
 
-    this.logger.log(`Collection "${name}" created with ${dimensions} dimensions and payload indexes`);
+    this.logger.log(
+      `Collection "${name}" created with ${dimensions} dimensions and payload indexes`,
+    );
   }
 
   async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
@@ -136,12 +140,12 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
       score: point.score,
       document: {
         id: point.id as string,
-        text: (point.payload?.text as string) || '',
+        text: (point.payload?.text as string) || "",
         embedding: [],
         metadata: {
-          source: (point.payload?.source as string) || '',
-          category: (point.payload?.category as string) || '',
-          author: (point.payload?.author as string) || '',
+          source: (point.payload?.source as string) || "",
+          category: (point.payload?.category as string) || "",
+          author: (point.payload?.author as string) || "",
           created_at: new Date(point.payload?.created_at as string),
           word_count: (point.payload?.word_count as number) || 0,
           tags: (point.payload?.tags as string[]) || [],
@@ -150,21 +154,25 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
     }));
   }
 
-  async filteredSearch(query: number[], filter: MetadataFilter, limit: number): Promise<SearchResult[]> {
+  async filteredSearch(
+    query: number[],
+    filter: MetadataFilter,
+    limit: number,
+  ): Promise<SearchResult[]> {
     // Build Qdrant filter
     const must: QdrantFilter[] = [];
 
     if (filter.source) {
-      must.push({ key: 'source', match: { value: filter.source } });
+      must.push({ key: "source", match: { value: filter.source } });
     }
     if (filter.category) {
-      must.push({ key: 'category', match: { value: filter.category } });
+      must.push({ key: "category", match: { value: filter.category } });
     }
     if (filter.word_count_min !== undefined) {
-      must.push({ key: 'word_count', range: { gte: filter.word_count_min } });
+      must.push({ key: "word_count", range: { gte: filter.word_count_min } });
     }
     if (filter.word_count_max !== undefined) {
-      must.push({ key: 'word_count', range: { lte: filter.word_count_max } });
+      must.push({ key: "word_count", range: { lte: filter.word_count_max } });
     }
 
     const qdrantFilter = must.length > 0 ? { must } : undefined;
@@ -182,12 +190,12 @@ export class QdrantService implements VectorDatabaseService, OnModuleInit {
       score: point.score,
       document: {
         id: point.id as string,
-        text: (point.payload?.text as string) || '',
+        text: (point.payload?.text as string) || "",
         embedding: [],
         metadata: {
-          source: (point.payload?.source as string) || '',
-          category: (point.payload?.category as string) || '',
-          author: (point.payload?.author as string) || '',
+          source: (point.payload?.source as string) || "",
+          category: (point.payload?.category as string) || "",
+          author: (point.payload?.author as string) || "",
           created_at: new Date(point.payload?.created_at as string),
           word_count: (point.payload?.word_count as number) || 0,
           tags: (point.payload?.tags as string[]) || [],

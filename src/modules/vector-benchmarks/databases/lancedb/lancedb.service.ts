@@ -1,13 +1,15 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as lancedb from '@lancedb/lancedb';
+import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+
+import * as lancedb from "@lancedb/lancedb";
+
 import {
   VectorDatabaseService,
   BenchmarkDocument,
   SearchResult,
   DatabaseStats,
   MetadataFilter,
-} from '../../interfaces/benchmark-result.interface';
+} from "../../interfaces/benchmark-result.interface";
 
 @Injectable()
 export class LanceDbService implements VectorDatabaseService, OnModuleInit {
@@ -18,14 +20,14 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const uri = this.configService.get('LANCEDB_URI', './data/lancedb');
+    const uri = this.configService.get("LANCEDB_URI", "./data/lancedb");
     this.db = await lancedb.connect(uri);
-    this.logger.log('LanceDB connection established');
+    this.logger.log("LanceDB connection established");
   }
 
   async initialize(): Promise<void> {
     // LanceDB doesn't require initialization
-    this.logger.log('LanceDB service initialized');
+    this.logger.log("LanceDB service initialized");
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -40,11 +42,11 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
 
     // Create table with first document (LanceDB infers schema)
     const dummyDoc = {
-      id: 'dummy',
-      text: 'dummy',
+      id: "dummy",
+      text: "dummy",
       embedding: new Array(dimensions).fill(0),
-      source: '',
-      category: '',
+      source: "",
+      category: "",
       word_count: 0,
     };
 
@@ -102,7 +104,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
         metadata: {
           source: result.source,
           category: result.category,
-          author: '',
+          author: "",
           created_at: new Date(),
           word_count: result.word_count,
           tags: [],
@@ -111,7 +113,11 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
     }));
   }
 
-  async filteredSearch(query: number[], filter: MetadataFilter, limit: number): Promise<SearchResult[]> {
+  async filteredSearch(
+    query: number[],
+    filter: MetadataFilter,
+    limit: number,
+  ): Promise<SearchResult[]> {
     const table = await this.db.openTable(this.currentTable);
 
     // Build SQL-like where clause
@@ -130,7 +136,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
       whereClauses.push(`word_count <= ${filter.word_count_max}`);
     }
 
-    const whereClause = whereClauses.join(' AND ');
+    const whereClause = whereClauses.join(" AND ");
 
     let search = table.vectorSearch(query).limit(limit);
 
@@ -150,7 +156,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
         metadata: {
           source: result.source,
           category: result.category,
-          author: '',
+          author: "",
           created_at: new Date(),
           word_count: result.word_count,
           tags: [],

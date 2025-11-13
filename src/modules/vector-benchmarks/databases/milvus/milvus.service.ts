@@ -1,13 +1,15 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { MilvusClient, DataType, IndexType, MetricType } from '@zilliz/milvus2-sdk-node';
+import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+
+import { MilvusClient, DataType, IndexType, MetricType } from "@zilliz/milvus2-sdk-node";
+
 import {
   VectorDatabaseService,
   BenchmarkDocument,
   SearchResult,
   DatabaseStats,
   MetadataFilter,
-} from '../../interfaces/benchmark-result.interface';
+} from "../../interfaces/benchmark-result.interface";
 
 interface MilvusSearchResultItem {
   id: string | number;
@@ -28,8 +30,8 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const host = this.configService.get('MILVUS_HOST', 'localhost');
-    const port = this.configService.get('MILVUS_PORT', '19530');
+    const host = this.configService.get("MILVUS_HOST", "localhost");
+    const port = this.configService.get("MILVUS_PORT", "19530");
 
     this.client = new MilvusClient({ address: `${host}:${port}` });
 
@@ -39,12 +41,12 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
       throw new Error(`Milvus connection failed: ${err.message}`);
     });
 
-    this.logger.log('Milvus connection established');
+    this.logger.log("Milvus connection established");
   }
 
   async initialize(): Promise<void> {
     // Milvus doesn't require initialization
-    this.logger.log('Milvus service initialized');
+    this.logger.log("Milvus service initialized");
   }
 
   async createCollection(name: string, dimensions: number): Promise<void> {
@@ -61,36 +63,36 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     // Create collection schema
     const schema = [
       {
-        name: 'id',
-        description: 'Document ID',
+        name: "id",
+        description: "Document ID",
         data_type: DataType.VarChar,
         is_primary_key: true,
         max_length: 255,
       },
       {
-        name: 'text',
-        description: 'Document text',
+        name: "text",
+        description: "Document text",
         data_type: DataType.VarChar,
         max_length: 65535,
       },
       {
-        name: 'embedding',
-        description: 'Vector embedding',
+        name: "embedding",
+        description: "Vector embedding",
         data_type: DataType.FloatVector,
         dim: dimensions,
       },
       {
-        name: 'source',
+        name: "source",
         data_type: DataType.VarChar,
         max_length: 255,
       },
       {
-        name: 'category',
+        name: "category",
         data_type: DataType.VarChar,
         max_length: 100,
       },
       {
-        name: 'word_count',
+        name: "word_count",
         data_type: DataType.Int32,
       },
     ];
@@ -107,7 +109,7 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
   async createVectorIndex(): Promise<void> {
     await this.client.createIndex({
       collection_name: this.currentCollection,
-      field_name: 'embedding',
+      field_name: "embedding",
       index_type: IndexType.HNSW,
       metric_type: MetricType.COSINE,
       params: {
@@ -120,14 +122,24 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
       collection_name: this.currentCollection,
     });
 
-    this.logger.log('HNSW index created and collection loaded');
+    this.logger.log("HNSW index created and collection loaded");
   }
 
   async insertVectors(documents: BenchmarkDocument[]): Promise<void> {
     const batchSize = 1000;
+    const startTime = Date.now();
+
+    this.logger.log(`Starting insertion of ${documents.length} vectors in batches of ${batchSize}`);
 
     for (let i = 0; i < documents.length; i += batchSize) {
       const batch = documents.slice(i, i + batchSize);
+      const batchStart = Date.now();
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      const progress = `${Math.min(i + batchSize, documents.length)}/${documents.length}`;
+
+      this.logger.log(
+        `Inserting batch ${batchNumber} (${batch.length} docs, progress: ${progress})`,
+      );
 
       const data = batch.map((doc) => ({
         id: doc.id,
@@ -143,39 +155,39 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
         data,
       });
 
-      if ((i + batchSize) % 10000 === 0) {
-        this.logger.log(
-          `Inserted ${Math.min(i + batchSize, documents.length)}/${documents.length} documents`,
-        );
-      }
+      const batchDuration = Date.now() - batchStart;
+      this.logger.log(
+        `Batch ${batchNumber} inserted in ${batchDuration}ms (progress: ${progress})`,
+      );
     }
 
-    this.logger.log(`Inserted ${documents.length} vectors successfully`);
+    const totalDuration = Date.now() - startTime;
+    this.logger.log(`Inserted ${documents.length} vectors successfully in ${totalDuration}ms`);
   }
 
   async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
     const result = await this.client.search({
       collection_name: this.currentCollection,
       data: [query],
-      anns_field: 'embedding',
+      anns_field: "embedding",
       limit,
       params: { ef: 200 },
-      output_fields: ['id', 'text', 'source', 'category'],
+      output_fields: ["id", "text", "source", "category"],
     });
 
     // Milvus returns an array of result sets (one per query)
-    const results = (result as unknown as MilvusSearchResultItem[][]) [0] || [];
+    const results = (result as unknown as MilvusSearchResultItem[][])[0] || [];
     return results.map((item: MilvusSearchResultItem) => ({
       id: String(item.id),
       score: item.score || 0,
       document: {
         id: String(item.id),
-        text: item.text || '',
+        text: item.text || "",
         embedding: [],
         metadata: {
-          source: item.source || '',
-          category: item.category || '',
-          author: '',
+          source: item.source || "",
+          category: item.category || "",
+          author: "",
           created_at: new Date(),
           word_count: 0,
           tags: [],
@@ -184,7 +196,11 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     }));
   }
 
-  async filteredSearch(query: number[], filter: MetadataFilter, limit: number): Promise<SearchResult[]> {
+  async filteredSearch(
+    query: number[],
+    filter: MetadataFilter,
+    limit: number,
+  ): Promise<SearchResult[]> {
     // Build filter expression
     const filterExpressions: string[] = [];
 
@@ -201,16 +217,16 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
       filterExpressions.push(`word_count <= ${filter.word_count_max}`);
     }
 
-    const filterExpression = filterExpressions.join(' && ');
+    const filterExpression = filterExpressions.join(" && ");
 
     const result = await this.client.search({
       collection_name: this.currentCollection,
       data: [query],
-      anns_field: 'embedding',
+      anns_field: "embedding",
       limit,
       params: { ef: 200 },
       filter: filterExpression || undefined,
-      output_fields: ['id', 'text', 'source', 'category'],
+      output_fields: ["id", "text", "source", "category"],
     });
 
     // Milvus returns an array of result sets (one per query)
@@ -220,12 +236,12 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
       score: item.score || 0,
       document: {
         id: String(item.id),
-        text: item.text || '',
+        text: item.text || "",
         embedding: [],
         metadata: {
-          source: item.source || '',
-          category: item.category || '',
-          author: '',
+          source: item.source || "",
+          category: item.category || "",
+          author: "",
           created_at: new Date(),
           word_count: 0,
           tags: [],
@@ -254,7 +270,7 @@ export class MilvusService implements VectorDatabaseService, OnModuleInit {
     });
 
     return {
-      vectorCount: parseInt(stats.data.row_count || '0'),
+      vectorCount: parseInt(stats.data.row_count || "0"),
       indexSize: 0,
       memoryUsage: 0,
     };
