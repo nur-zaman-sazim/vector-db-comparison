@@ -2,6 +2,14 @@ import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import * as lancedb from "@lancedb/lancedb";
+import {
+  Schema,
+  Field,
+  Float32,
+  FixedSizeList,
+  Utf8,
+  Int32,
+} from "apache-arrow";
 
 import {
   VectorDatabaseService,
@@ -40,23 +48,21 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
       // Table doesn't exist
     }
 
-    // Create table with first document (LanceDB infers schema)
-    const dummyDoc = {
-      id: "dummy",
-      text: "dummy",
-      embedding: new Float32Array(dimensions),
-      source: "",
-      category: "",
-      word_count: 0,
-    };
+    // Define explicit schema with proper vector type
+    const schema = new Schema([
+      new Field("id", new Utf8()),
+      new Field("text", new Utf8()),
+      new Field(
+        "embedding",
+        new FixedSizeList(dimensions, new Field("item", new Float32())),
+      ),
+      new Field("source", new Utf8()),
+      new Field("category", new Utf8()),
+      new Field("word_count", new Int32()),
+    ]);
 
-    const table = await this.db.createTable(name, [dummyDoc]);
-
-    // Delete dummy document
-    await table.delete('id = "dummy"');
-
-    // Create vector index
-    // LanceDB will automatically create an appropriate index for the vector column
+    // Create empty table with schema
+    const table = await this.db.createEmptyTable(name, schema);
 
     this.logger.log(`Collection "${name}" created with ${dimensions} dimensions`);
   }
