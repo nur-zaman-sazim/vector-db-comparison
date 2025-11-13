@@ -44,7 +44,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
     const dummyDoc = {
       id: "dummy",
       text: "dummy",
-      embedding: new Array(dimensions).fill(0),
+      embedding: new Float32Array(dimensions),
       source: "",
       category: "",
       word_count: 0,
@@ -71,7 +71,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
       const data = batch.map((doc) => ({
         id: doc.id,
         text: doc.text,
-        embedding: doc.embedding,
+        embedding: new Float32Array(doc.embedding),
         source: doc.metadata.source,
         category: doc.metadata.category,
         word_count: doc.metadata.word_count,
@@ -92,8 +92,11 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
   async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
     const table = await this.db.openTable(this.currentTable);
 
+    // Convert to Float32Array for LanceDB
+    const queryVector = new Float32Array(query);
+
     const results = await table
-      .vectorSearch(query)
+      .vectorSearch(queryVector)
       .column("embedding")
       .limit(limit)
       .toArray();
@@ -142,7 +145,10 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
 
     const whereClause = whereClauses.join(" AND ");
 
-    let search = table.vectorSearch(query).column("embedding").limit(limit);
+    // Convert to Float32Array for LanceDB
+    const queryVector = new Float32Array(query);
+
+    let search = table.vectorSearch(queryVector).column("embedding").limit(limit);
 
     if (whereClause) {
       search = search.where(whereClause);
