@@ -92,7 +92,11 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
   async vectorSearch(query: number[], limit: number): Promise<SearchResult[]> {
     const table = await this.db.openTable(this.currentTable);
 
-    const results = await table.vectorSearch(query).limit(limit).toArray();
+    const results = await table
+      .vectorSearch(query)
+      .column("embedding")
+      .limit(limit)
+      .toArray();
 
     return results.map((result) => ({
       id: result.id,
@@ -138,7 +142,7 @@ export class LanceDbService implements VectorDatabaseService, OnModuleInit {
 
     const whereClause = whereClauses.join(" AND ");
 
-    let search = table.vectorSearch(query).limit(limit);
+    let search = table.vectorSearch(query).column("embedding").limit(limit);
 
     if (whereClause) {
       search = search.where(whereClause);
