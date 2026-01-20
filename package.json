@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.685.0",
-    "@aws-sdk/s3-request-presigner": "^3.485.0",
+    "@aws-sdk/s3-request-presigner": "^3.971.0",
     "@cantoo/pdf-lib": "^2.2.3",
     "@lancedb/lancedb": "^0.15.0",
     "@metinseylan/nestjs-opentelemetry": "^3.0.0",
