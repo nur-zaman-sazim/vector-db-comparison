@@ -1474,10 +1474,10 @@
     fs-extra "11.2.0"
     globby "11.1.0"
 
-"@nestjs/axios@^3.1.2":
-  version "3.1.2"
-  resolved "https://registry.npmjs.org/@nestjs/axios/-/axios-3.1.2.tgz"
-  integrity sha512-pFlfi4ZQsZtTNNhvgssbxjCHUd1nMpV3sXy/xOOB2uEJhw3M8j8SFR08gjFNil2we2Har7VCsXLfCkwbMHECFQ==
+"@nestjs/axios@^4.0.1":
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/@nestjs/axios/-/axios-4.0.1.tgz#7ff73f47727b67dc04410ac6e9b3329401ebbb65"
+  integrity sha512-68pFJgu+/AZbWkGu65Z3r55bTsCPlgyKaV4BSG8yUAD72q1PPuyVRgUwFv6BxdnibTUHlyxm06FmYWNC+bjN7A==
 
 "@nestjs/cli@^10.3.2":
   version "10.3.2"
