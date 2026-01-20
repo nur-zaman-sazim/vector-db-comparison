@@ -88,7 +88,7 @@
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5",
     "uuidv4": "^6.2.13",
-    "winston": "^3.16.0",
+    "winston": "^3.19.0",
     "winston-daily-rotate-file": "^4.7.1"
   },
   "devDependencies": {
