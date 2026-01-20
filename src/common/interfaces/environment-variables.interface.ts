@@ -19,4 +19,22 @@ export interface IEnvironmentVariables {
   GOOGLE_CLIENT_SECRET: string;
   WEB_CLIENT_BASE_URL: string;
   SEND_FROM_EMAIL: string;
+
+  // Vector Database Configuration
+  // PGVector uses the main DATABASE_URL connection
+
+  CHROMADB_URL?: string;
+
+  MILVUS_HOST?: string;
+  MILVUS_PORT?: number;
+
+  QDRANT_URL?: string;
+  QDRANT_API_KEY?: string;
+
+  LANCEDB_URI?: string;
+
+  // Benchmark Configuration
+  BENCHMARK_VECTOR_COUNT?: number;
+  BENCHMARK_DIMENSIONS?: number;
+  BENCHMARK_CONCURRENCY?: number;
 }
